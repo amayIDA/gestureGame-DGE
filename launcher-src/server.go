@@ -5,8 +5,10 @@
 //	Game screen                ──POST /api/status────▶  waiting / countdown / playing / results / done
 //	Both                       ──GET  /api/state─────▶  polled twice a second
 //
-// Every registration and result is also appended to registrations.csv (UTF-8 with BOM,
-// so Excel shows Arabic names correctly).
+// Saved next to the program (UTF-8 with BOM, so Excel shows Arabic names correctly):
+//
+//	players.csv   — one row per registered player: name, email, timestamp
+//	game-log.csv  — everything that happened: registrations, scores, no-shows, removals
 //
 // server.py (Mac) implements exactly the same API — keep the two in sync.
 package main
@@ -70,11 +72,11 @@ type Hub struct {
 	current  *Session
 	recent   []*Session
 	lastGame time.Time
-	csvPath  string
+	dir      string // where players.csv and game-log.csv are written
 	port     int
 }
 
-func NewHub(csvPath string, port int) *Hub { return &Hub{csvPath: csvPath, port: port, nextID: 1} }
+func NewHub(dir string, port int) *Hub { return &Hub{dir: dir, port: port, nextID: 1} }
 
 func nowMs() int64 { return time.Now().UnixMilli() }
 
@@ -168,7 +170,10 @@ func (h *Hub) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if h.current != nil {
 		ahead++
 	}
+	ts := time.Now().Format("2006-01-02 15:04:05")
 	for i, p := range players {
+		appendCSV(filepath.Join(h.dir, "players.csv"), []string{"name", "email", "timestamp"},
+			[]string{safeCell(p.Name), safeCell(p.Email), ts})
 		h.logCSV("registered", s, i, p, nil)
 	}
 	writeJSON(w, 200, map[string]any{"id": s.ID, "ahead": ahead})
@@ -282,13 +287,15 @@ func (h *Hub) handleRemove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 409, map[string]any{"error": "not_removable"})
 }
 
-// ── CSV log ──
-func (h *Hub) logCSV(event string, s *Session, idx int, p Player, res *Result) {
-	if h.csvPath == "" {
+// ── CSV files ──
+
+// appendCSV adds one row; a new file gets a UTF-8 BOM (so Excel reads Arabic) and a header.
+func appendCSV(path string, header, row []string) {
+	if path == "" {
 		return
 	}
-	_, statErr := os.Stat(h.csvPath)
-	f, err := os.OpenFile(h.csvPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	_, statErr := os.Stat(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return
 	}
@@ -296,9 +303,14 @@ func (h *Hub) logCSV(event string, s *Session, idx int, p Player, res *Result) {
 	cw := csv.NewWriter(f)
 	cw.UseCRLF = true // Excel-friendly line endings
 	if os.IsNotExist(statErr) {
-		f.WriteString("\xEF\xBB\xBF") // BOM so Excel reads UTF-8 (Arabic) correctly
-		cw.Write([]string{"time", "event", "session", "mode", "player", "name", "email", "score", "correct", "wrong", "outcome"})
+		f.WriteString("\xEF\xBB\xBF")
+		cw.Write(header)
 	}
+	cw.Write(row)
+	cw.Flush()
+}
+
+func (h *Hub) logCSV(event string, s *Session, idx int, p Player, res *Result) {
 	score, correct, wrong, outcome := "", "", "", ""
 	if res != nil {
 		score, correct, wrong = fmt.Sprint(res.Score), fmt.Sprint(res.Correct), fmt.Sprint(res.Wrong)
@@ -313,9 +325,10 @@ func (h *Hub) logCSV(event string, s *Session, idx int, p Player, res *Result) {
 			outcome = "lose"
 		}
 	}
-	cw.Write([]string{time.Now().Format("2006-01-02 15:04:05"), event, s.ID, s.Mode, fmt.Sprint(idx + 1),
-		safeCell(p.Name), safeCell(p.Email), score, correct, wrong, outcome})
-	cw.Flush()
+	appendCSV(filepath.Join(h.dir, "game-log.csv"),
+		[]string{"time", "event", "session", "mode", "player", "name", "email", "score", "correct", "wrong", "outcome"},
+		[]string{time.Now().Format("2006-01-02 15:04:05"), event, s.ID, s.Mode, fmt.Sprint(idx + 1),
+			safeCell(p.Name), safeCell(p.Email), score, correct, wrong, outcome})
 }
 
 // stop spreadsheet formula injection (=, +, -, @ at the start of a cell)
@@ -410,14 +423,13 @@ func lanIPs() []string {
 	return out
 }
 
-func csvLocation(exeDir, dataDir string) string {
-	p := filepath.Join(exeDir, "registrations.csv")
-	if f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+// Save the CSV files next to the program; if that folder is read-only, use the app-data folder.
+func dataLocation(exeDir, dataDir string) string {
+	probe := filepath.Join(exeDir, ".write-test")
+	if f, err := os.Create(probe); err == nil {
 		f.Close()
-		if st, _ := os.Stat(p); st != nil && st.Size() == 0 {
-			os.Remove(p) // created just to test; real header is written on first use
-		}
-		return p
+		os.Remove(probe)
+		return exeDir
 	}
-	return filepath.Join(dataDir, "registrations.csv")
+	return dataDir
 }

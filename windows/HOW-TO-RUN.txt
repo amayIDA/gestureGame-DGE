@@ -20,8 +20,9 @@ EVERY DAY
 
 Close the game with Alt+F4. Keep the black window open while playing.
 
-REGISTRATIONS + SCORES are saved in registrations.csv next to the .exe
-(opens in Excel, Arabic names included).
+PLAYER DATA is saved next to the .exe (opens in Excel, Arabic names included):
+  players.csv   - everyone registered on the tablet: name, email, timestamp
+  game-log.csv  - full history with scores, no-shows and removals
 
 PORTS: the game uses port 7420 only. Other apps using 3000 / 5173 are not affected.
 To use another port, set  port=7421  in settings.txt.

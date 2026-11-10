@@ -3,5 +3,7 @@ __pycache__/
 assets/_source/
 launcher-src/game/
 launcher-src/dist/
+# player data (names, emails) — never commit
+players.csv
+game-log.csv
 registrations.csv
-windows/registrations.csv

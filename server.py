@@ -12,7 +12,8 @@ import csv, http.server, json, os, socket, socketserver, sys, threading, time, u
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 7420
 ROOT = os.path.dirname(os.path.abspath(__file__))
-CSV_PATH = os.path.join(ROOT, 'registrations.csv')
+PLAYERS_CSV = os.path.join(ROOT, 'players.csv')    # name, email, timestamp — one row per registered player
+GAME_LOG_CSV = os.path.join(ROOT, 'game-log.csv')  # registrations, scores, no-shows, removals
 os.chdir(ROOT)
 
 
@@ -34,6 +35,19 @@ def clean_text(v, maxlen):
         space = False
         out.append(ch)
     return ''.join(out).strip()[:maxlen].strip()
+
+
+def append_csv(path, header, row):
+    """add one row; a new file gets a UTF-8 BOM (so Excel reads Arabic) and a header"""
+    try:
+        new = not os.path.exists(path)
+        with open(path, 'a', newline='', encoding='utf-8-sig' if new else 'utf-8') as f:
+            w = csv.writer(f, lineterminator='\r\n')
+            if new:
+                w.writerow(header)
+            w.writerow(row)
+    except OSError:
+        pass
 
 
 def safe_cell(v):
@@ -58,21 +72,14 @@ class Hub:
         self.recent = ([s] + self.recent)[:10]
 
     def log(self, event, s, idx, p, res=None):
-        try:
-            new = not os.path.exists(CSV_PATH)
-            with open(CSV_PATH, 'a', newline='', encoding='utf-8-sig' if new else 'utf-8') as f:
-                w = csv.writer(f)
-                if new:
-                    w.writerow(['time', 'event', 'session', 'mode', 'player', 'name', 'email', 'score', 'correct', 'wrong', 'outcome'])
-                score = correct = wrong = outcome = ''
-                if res:
-                    score, correct, wrong = res.get('score', ''), res.get('correct', ''), res.get('wrong', '')
-                    win = s.get('winner')
-                    outcome = 'solo' if s['mode'] == 'single' else 'tie' if win is None else 'win' if win == idx else 'lose'
-                w.writerow([time.strftime('%Y-%m-%d %H:%M:%S'), event, s['id'], s['mode'], idx + 1,
-                            safe_cell(p['name']), safe_cell(p.get('email', '')), score, correct, wrong, outcome])
-        except OSError:
-            pass
+        score = correct = wrong = outcome = ''
+        if res:
+            score, correct, wrong = res.get('score', ''), res.get('correct', ''), res.get('wrong', '')
+            win = s.get('winner')
+            outcome = 'solo' if s['mode'] == 'single' else 'tie' if win is None else 'win' if win == idx else 'lose'
+        append_csv(GAME_LOG_CSV, ['time', 'event', 'session', 'mode', 'player', 'name', 'email', 'score', 'correct', 'wrong', 'outcome'],
+                   [time.strftime('%Y-%m-%d %H:%M:%S'), event, s['id'], s['mode'], idx + 1,
+                    safe_cell(p['name']), safe_cell(p.get('email', '')), score, correct, wrong, outcome])
 
     # ── API ──
     def state(self, is_game):
@@ -107,7 +114,9 @@ class Hub:
             self.queue.append(s)
             self.seq += 1
             ahead = len(self.queue) - 1 + (1 if self.current else 0)
+            ts = time.strftime('%Y-%m-%d %H:%M:%S')
             for i, p in enumerate(players):
+                append_csv(PLAYERS_CSV, ['name', 'email', 'timestamp'], [safe_cell(p['name']), safe_cell(p['email']), ts])
                 self.log('registered', s, i, p)
             return 200, {'id': s['id'], 'ahead': ahead}
 
@@ -268,7 +277,7 @@ if __name__ == '__main__':
     print('  Catch the Target')
     print('────────────────────────────────────────')
     print(f'✓ Game:          http://127.0.0.1:{PORT}/')
-    print(f'✓ Registrations: {CSV_PATH}')
+    print(f'✓ Players (name, email, time) saved to: {PLAYERS_CSV}')
     ips = lan_ips()
     if ips:
         print('\n  ┌─ ON THE TABLET (same Wi-Fi) open: ─────────────')

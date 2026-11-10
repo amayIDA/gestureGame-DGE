@@ -37,7 +37,9 @@ The game uses **one port: 7420** (TCP), on the game PC only. Ports only clash wh
 
 Names work in English and Arabic (typed on the tablet with the normal keyboard). They display correctly right-to-left, including mixed text like "سارة wins!".
 
-**Registrations and scores** are saved to `registrations.csv` (next to the .exe on Windows, next to `server.py` on Mac): time, event (registered / result / noshow / cancelled), session, mode, player, name, email, score, correct, wrong, outcome. It opens directly in Excel with Arabic intact.
+**Data saved on the game PC** (next to the .exe on Windows, next to `server.py` on Mac). Both files open directly in Excel with Arabic names intact:
+- **`players.csv`**: everyone who registers on the tablet, one row per player: **name, email, timestamp**.
+- **`game-log.csv`**: the full history: registrations, scores (score, correct, wrong, win/lose/tie), no-shows and removals.
 
 **Tablet queue view:** tap the status chip (top-right) to see who is at the screen, who is waiting (with **Remove**), and recent results.
 
@@ -85,7 +87,7 @@ index.html, css/style.css
 js/main.js        flow / screens / HUD / names
 js/link.js        talks to the server (registered players in, progress + results out)
 register/         tablet registration app (index.html, style.css, app.js, Figma assets)
-server.py         Mac/any-OS server: game + tablet + player queue API + registrations.csv
+server.py         Mac/any-OS server: game + tablet + player queue API + players.csv / game-log.csv
 windows/          CatchTheTarget.bat (start here), CatchTheTarget.exe, settings.txt
 js/game.js        falling items, baskets, scoring, effects (canvas)
 js/idtracker.js   persistent player IDs

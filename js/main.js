@@ -327,7 +327,7 @@ const FLOWS = {
       card.querySelector('bdi').textContent = nameOf(s);
       cards.append(card);
     }
-    // send the scores back to the tablet / registrations.csv (one entry per registered player)
+    // send the scores back to the server (tablet queue view + game-log.csv), one entry per registered player
     const count = session?.players?.length || slots.length;
     const results = Array.from({ length: count }, (_, i) => {
       const r = sc[i + 1];

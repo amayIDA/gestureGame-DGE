@@ -111,8 +111,8 @@ func main() {
 		}
 		fail("Port %d is being used by another program.\n  Pick a different one in settings.txt, e.g.  port=7421", *port)
 	}
-	csvPath := csvLocation(exeDir, dataDir)
-	hub := NewHub(csvPath, *port)
+	saveDir := dataLocation(exeDir, dataDir)
+	hub := NewHub(saveDir, *port)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/__ping", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "catch-the-target") })
 	hub.Routes(mux)
@@ -120,7 +120,7 @@ func main() {
 	go func() { _ = http.Serve(ln, mux) }()
 	gameURL := fmt.Sprintf("http://127.0.0.1:%d/?%s", *port, query.Encode())
 	say("✓ Server running on port %d", *port)
-	say("✓ Registrations are saved to %s", csvPath)
+	say("✓ Players (name, email, time) are saved to %s", filepath.Join(saveDir, "players.csv"))
 	say("")
 	if ips := lanIPs(); len(ips) > 0 {
 		say("  ┌─ ON THE TABLET (same Wi-Fi) open: ─────────────")
