@@ -1,0 +1,16 @@
+CATCH THE TARGET - Windows
+
+1. Copy CatchTheTarget.exe (and settings.txt, optional) to the Windows PC.
+   The game is fully inside the .exe - nothing else is needed.
+2. Plug in a webcam.
+3. Double-click CatchTheTarget.exe.
+   - First time only: if Windows shows "Windows protected your PC",
+     click "More info" -> "Run anyway".
+   - If no Chrome or Edge is found it installs Google Chrome automatically
+     (internet needed for that step only).
+4. The game opens full screen. Close it with Alt+F4.
+
+Keys: K = keyboard mode, C = camera view, Shift+D = debug,
+      Enter = skip screen, Esc = back to start, M = mute.
+
+Problems? See %LOCALAPPDATA%\CatchTheTarget\launcher.log
