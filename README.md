@@ -1,32 +1,47 @@
-# Catch the Target — SCAD two-player body-tracking game
+# Catch the Target — SCAD body-tracking game with tablet registration
 
-Two players stand side by side in front of a webcam. Each player's basket follows their body left and right. They catch SCAD-related items (statistics, census, data…) and let unrelated ones (frying pan, perfume…) fall past.
+Players register on a **tablet** (one player or two). The **game PC** calls them in by name; they stand in front of the webcam and their basket follows their body left and right. They catch SCAD-related items (statistics, census, data…) and let unrelated ones (frying pan, perfume…) fall past. 60-second rounds.
 
-## Display
-The game renders at **1536 × 762**. On a screen with that resolution it fills the screen exactly; on any other screen it scales to fit and keeps its shape, with thin bars if needed. The background on every screen is a looping skyline video (`assets/ui/background.mp4`, with a WebM fallback and a poster frame).
+Two parts, served by one program on the game PC:
+
+| | Where | What |
+|---|---|---|
+| **Game** | PC + webcam + big screen | `http://127.0.0.1:7420/` |
+| **Registration** | iPad / any tablet on the same Wi-Fi | `http://<PC address>:7420/register/` |
 
 ## Run it
 
-**Windows, one file:** copy `windows/CatchTheTarget.exe` to the PC and double-click it. The whole game is built into the .exe, so no Python or anything else is needed. If neither Chrome nor Edge is installed, it installs Chrome automatically (via winget, or Google's installer). It also warns if no webcam is plugged in, then opens the game full-screen. Optional `settings.txt` next to the exe changes round length, model, etc. Logs go to `%LOCALAPPDATA%\CatchTheTarget\launcher.log`. After changing the game, rebuild the exe with `launcher-src/build.sh` (needs Go).
+**Windows:** copy the `windows` folder to the PC and double-click **`CatchTheTarget.bat`**.
+- First run only: click **Yes** on the Windows prompt. This adds a firewall rule so the tablet can reach the PC. If "Windows protected your PC" appears: More info → Run anyway.
+- The game opens full-screen. The black window shows the **tablet link**, e.g. `http://192.168.1.42:7420/register/`. The idle screen also shows it with a **QR code** (bottom-right).
+- The whole game is built into `CatchTheTarget.exe`; nothing else is needed. If neither Chrome nor Edge is installed, Chrome is installed automatically. Close the game with Alt+F4.
+- `settings.txt` changes the port, round length, etc. Logs: `%LOCALAPPDATA%\CatchTheTarget\launcher.log`. Rebuild the exe after changing the game with `launcher-src/build.sh` (needs Go).
 
-**Mac, one click:** double-click `start.command`. It starts a local server and opens Chrome full-screen in kiosk mode, with the camera allowed and sound on.
-(The first time, macOS may ask you to allow it: right-click → Open. Quit kiosk with ⌘Q.)
+**Mac:** double-click **`start.command`**. It starts the server, opens Chrome full-screen and prints the tablet link in the Terminal window. If macOS asks whether Python may accept incoming connections, click **Allow** (needed for the tablet).
 
-**Manually:**
-```
-python3 server.py        # then open http://localhost:8080 in Chrome
-```
-The game must be served over `http://localhost`. Opening `index.html` as a file won't get camera access.
+**Manually:** `python3 server.py`, then open `http://127.0.0.1:7420` in Chrome.
 
-Everything runs offline. The MediaPipe runtime and both pose models are in `vendor/`. Only the Inter web font loads from Google Fonts, and it falls back to the system font when offline.
+**On the tablet:** open the link in Safari/Chrome. Use Share → **Add to Home Screen** so it runs full-screen like an app; turn on Guided Access to lock it to the registration page.
 
-## Flow (matches the Figma storyboard)
-1. **Attract / Join.** Stand on your side and raise one hand for under a second. P1 is the left side, P2 the right. A live camera preview (bottom-right) shows each person's skeleton tagged P1/P2.
-   If only one person is ready and nobody is on the other side, a solo round starts after 6 s.
-2. **What to catch.** The 30 + 30 item guide. Auto-advances after 8 s.
-3. **Countdown.** 3‑2‑1‑GO. Baskets are already live so players can feel the controls.
-4. **Gameplay.** 30 s. +1 per SCAD item, −1 for an unrelated item, golden bonus star +3, and +1 for every 5 in a row. Speed and density ramp up, with a "Final 10 seconds" rush.
-5. **Results.** Winner, accuracy, best streak. Body tracking is switched off here: players are released and detection pauses. After 15 s (`?idle=` to change) it returns to the join screen, where tracking starts again and new players can step in.
+Everything runs offline on the local network. The MediaPipe runtime, pose models and fonts (Inter + Noto Sans Arabic) are all in `vendor/`.
+
+## Ports and other apps on the same network
+The game uses **one port: 7420** (TCP), on the game PC only. Ports only clash when two programs on the **same computer** use the same number. Another app using 3000 / 5173 (on this PC or any other) is not affected, and its tablet won't interfere: each tablet talks to its own PC's address. If 7420 is ever taken, set `port=7421` in `settings.txt` (Windows) or edit `PORT` in `start.command` (Mac).
+
+## Flow
+1. **Idle — "What to catch".** The 30 + 30 item guide with "Register on the tablet to play", plus the tablet link and QR code.
+2. **Tablet registration** (from the Figma "iPad registration" screens, English + Arabic): Welcome → One player / Two players → name (+ optional email) for Player 1 → Player 2 → Thank you. The thank-you screen shows the queue position ("You're next!", "2 groups ahead of you"). Groups queue up while others play.
+3. **Join.** The game calls in the next group **by name**. Two players: left = first name registered, right = second. One player: stand anywhere. Each raises a hand to start. If they don't show up within 60 s (`noshow=`), the game starts with whoever is ready, or moves to the next group.
+4. **Countdown → Gameplay (60 s).** Names on the scoreboard and under each basket. +1 per SCAD item, −1 for an unrelated item, golden bonus star +3, +1 for every 5 in a row. Speed ramps up, with a "Final 10 seconds" rush.
+5. **Results.** "<Name> wins!" (or a tie / solo score). Body tracking is off. Scores are sent back to the tablet's queue view and saved. After 15 s it returns to idle and calls the next group.
+
+Names work in English and Arabic (typed on the tablet with the normal keyboard). They display correctly right-to-left, including mixed text like "سارة wins!".
+
+**Registrations and scores** are saved to `registrations.csv` (next to the .exe on Windows, next to `server.py` on Mac): time, event (registered / result / noshow / cancelled), session, mode, player, name, email, score, correct, wrong, outcome. It opens directly in Excel with Arabic intact.
+
+**Tablet queue view:** tap the status chip (top-right) to see who is at the screen, who is waiting (with **Remove**), and recent results.
+
+**Operator keys on the game PC:** `Esc` skip the current group · `Enter` skip a screen (on idle: start a test game without the tablet; `Shift+Enter` = one player) · `C` camera view · `Shift+D` debug · `K` keyboard mode · `M` mute · `F` full screen.
 
 ## Player IDs that don't switch
 MediaPipe reports poses in random order each frame. `js/idtracker.js` turns them into two stable players:
@@ -50,24 +65,28 @@ MediaPipe reports poses in random order each frame. `js/idtracker.js` turns them
 - Use a 1080p webcam and even, front-facing light. Avoid strong backlight such as windows behind the players.
 - Tune each player's reach with URL params if needed: `?p1min=0.08&p1max=0.46&p2min=0.54&p2max=0.92`.
 
-## Keys (operator)
+## Keys (all)
 | Key | Action |
 |---|---|
 | `K` | Keyboard test mode (P1: A/D + W to raise hand · P2: ←/→ + ↑ · `1`/`2` make a player leave/return) |
-| `Enter` | Skip to next screen |
-| `Esc` | Back to Attract |
+| `Enter` | Skip to next screen (idle: test game without the tablet, `Shift+Enter` = one player) |
+| `Esc` | Skip the current group, back to idle |
 | `C` | Toggle camera preview |
 | `Shift+D` | Debug overlay (fps, tracker state) |
 | `M` | Mute |
 | `F` | Full screen |
 
 ## URL options
-`?round=45` round length · `?model=lite` faster model for weaker machines · `?solo=0` disable solo · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?maxdist=4.5` max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection
+`?round=60` round length · `?noshow=60` wait for registered players (s) · `?model=lite` faster model for weaker machines · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?maxdist=4.5` max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection
 
 ## Files
 ```
 index.html, css/style.css
-js/main.js        flow / screens / HUD
+js/main.js        flow / screens / HUD / names
+js/link.js        talks to the server (registered players in, progress + results out)
+register/         tablet registration app (index.html, style.css, app.js, Figma assets)
+server.py         Mac/any-OS server: game + tablet + player queue API + registrations.csv
+windows/          CatchTheTarget.bat (start here), CatchTheTarget.exe, settings.txt
 js/game.js        falling items, baskets, scoring, effects (canvas)
 js/idtracker.js   persistent player IDs
 js/presence.js    distance limit, photo/poster and reflection rejection
@@ -77,5 +96,6 @@ js/config.js      all tunables
 assets/items/     60 item images from Figma (catch/ and avoid/)
 assets/ui/        background video (+ webm fallback, poster), title
 assets/figma/     raw exports from the Figma file
-vendor/           MediaPipe tasks-vision 0.10.35 + pose models (full, lite)
+vendor/           MediaPipe tasks-vision 0.10.35 + pose models, fonts, QR code generator
+launcher-src/     Windows launcher + server (Go): main.go, server.go — same API as server.py
 ```

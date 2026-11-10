@@ -1,7 +1,8 @@
 // Catch the Target — self-contained launcher.
 //
 // One file to copy to any PC. It:
-//  1. serves the whole game (embedded inside this .exe) on http://127.0.0.1
+//  1. serves the whole game (embedded inside this .exe) and the tablet registration app
+//     on the local network (port 7420 by default)
 //  2. finds Chrome or Edge — and installs Chrome automatically if neither exists
 //  3. warns if no webcam is connected
 //  4. opens the game full-screen (kiosk) with camera + sound pre-allowed
@@ -26,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,7 +41,7 @@ var logger *log.Logger
 
 func main() {
 	windowed := flag.Bool("windowed", false, "open in a normal window instead of full-screen kiosk")
-	port := flag.Int("port", 8080, "local port (falls back to a free one if busy)")
+	port := flag.Int("port", 7420, "network port for the game and the tablet registration app")
 	options := flag.String("options", "", "extra game options, e.g. \"round=45&model=lite\"")
 	serverOnly := flag.Bool("server-only", false, "only run the web server (open the URL yourself)")
 	flag.Parse()
@@ -58,6 +60,12 @@ func main() {
 		*windowed = true
 	}
 	delete(settings, "windowed")
+	if v, ok := settings["port"]; ok {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n < 65536 {
+			*port = n
+		}
+		delete(settings, "port")
+	}
 	query := url.Values{}
 	for k, v := range settings {
 		query.Set(k, v)
@@ -93,20 +101,37 @@ func main() {
 	} {
 		_ = mime.AddExtensionType(ext, typ)
 	}
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *port))
+	// Listen on the whole local network (not just this PC) so the tablet can connect.
+	// The port is fixed so the tablet's bookmarked link keeps working.
+	ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", *port))
 	if err != nil {
-		ln, err = net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			fail("Could not start the local web server: %v", err)
+		if r, e := http.Get(fmt.Sprintf("http://127.0.0.1:%d/__ping", *port)); e == nil {
+			r.Body.Close()
+			fail("Catch the Target is already running (port %d). Close the other window first.", *port)
 		}
+		fail("Port %d is being used by another program.\n  Pick a different one in settings.txt, e.g.  port=7421", *port)
 	}
-	addr := ln.Addr().(*net.TCPAddr)
+	csvPath := csvLocation(exeDir, dataDir)
+	hub := NewHub(csvPath, *port)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/__ping", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "catch-the-target") })
+	hub.Routes(mux)
 	mux.Handle("/", noCache(http.FileServer(root)))
 	go func() { _ = http.Serve(ln, mux) }()
-	gameURL := fmt.Sprintf("http://127.0.0.1:%d/?%s", addr.Port, query.Encode())
-	say("✓ Game server running at http://127.0.0.1:%d", addr.Port)
+	gameURL := fmt.Sprintf("http://127.0.0.1:%d/?%s", *port, query.Encode())
+	say("✓ Server running on port %d", *port)
+	say("✓ Registrations are saved to %s", csvPath)
+	say("")
+	if ips := lanIPs(); len(ips) > 0 {
+		say("  ┌─ ON THE TABLET (same Wi-Fi) open: ─────────────")
+		for _, ip := range ips {
+			say("  │   http://%s:%d/register/", ip, *port)
+		}
+		say("  └────────────────────────────────────────────────")
+	} else {
+		say("! This PC isn't connected to a network — the tablet can't reach it.")
+	}
+	say("")
 
 	if *serverOnly {
 		say("Open %s in Chrome or Edge. Press Ctrl+C to stop.", gameURL)

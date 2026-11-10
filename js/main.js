@@ -1,11 +1,18 @@
 // Catch the Target — flow controller.
-// 01 Attract/Join → 02 What to catch → 03 Countdown → 04 Gameplay → 05 Results (tracking off) → 01 Attract
+//
+//   Idle ("What to catch", waiting for the tablet)
+//     → players registered on the tablet → Join (their names; raise a hand)
+//     → Countdown → Gameplay (60 s) → Results (tracking off) → Idle → next group
+//
+// Single player: one basket across the whole screen. Two players: left / right halves.
 import { CONFIG } from './config.js';
 import { CATCH_ITEMS, AVOID_ITEMS, ALL_ITEMS, UI } from './items.js';
 import { Game, PLAYER, STAGE_W, STAGE_H } from './game.js';
 import { IdTracker } from './idtracker.js';
 import { PresenceFilter } from './presence.js';
 import { Sfx } from './audio.js';
+import { Link } from './link.js';
+import qrcode from '../vendor/qrcode/qrcode.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
@@ -18,6 +25,7 @@ const tracker = new IdTracker({ lostGraceMs: CONFIG.LOST_GRACE_MS });
 // Ignores people who are too far away and bodies that never move (photos / posters / screens)
 const presence = new PresenceFilter({ maxDistance: CONFIG.MAX_DISTANCE_M, liveness: CONFIG.LIVENESS, liveMotion: CONFIG.LIVE_MOTION, facing: CONFIG.FACING, reflections: CONFIG.REFLECTIONS });
 const images = {};
+const link = new Link();
 
 // ─────────────────────────── stage scaling ───────────────────────────
 function fit() {
@@ -37,7 +45,7 @@ function simDets(dt) {
   const k = sim.keys, sp = 0.55 * dt;
   if (k.has('a')) sim.p[1].x -= sp; if (k.has('d')) sim.p[1].x += sp;
   if (k.has('arrowleft')) sim.p[2].x -= sp; if (k.has('arrowright')) sim.p[2].x += sp;
-  sim.p[1].x = clamp(sim.p[1].x, 0.02, 0.49); sim.p[2].x = clamp(sim.p[2].x, 0.51, 0.98);
+  sim.p[1].x = clamp(sim.p[1].x, 0.02, activeSlots.length === 1 ? 0.98 : 0.49); sim.p[2].x = clamp(sim.p[2].x, 0.51, 0.98);
   const out = [];
   for (const s of [1, 2]) {
     const p = sim.p[s]; if (!p.present) continue;
@@ -58,8 +66,8 @@ addEventListener('keydown', (e) => {
   if (key === 'c') $('pipWrap').classList.toggle('hidden', !$('pipWrap').classList.contains('hidden'));
   if (key === 'm') { sfx.muted = !sfx.muted; toast(sfx.muted ? 'Sound off' : 'Sound on'); }
   if (key === 'f') document.documentElement.requestFullscreen?.();
-  if (key === 'enter') flow.skip?.();
-  if (key === 'escape') go('attract');
+  if (key === 'enter') flow.skip?.(e.shiftKey);
+  if (key === 'escape') abortSession();
 });
 addEventListener('keyup', (e) => sim.keys.delete(e.key.toLowerCase()));
 addEventListener('pointerdown', () => sfx.ensure());
@@ -75,19 +83,24 @@ function banner(text, red = false) {
   void el.offsetWidth; el.className = 'show' + (red ? ' red' : '');
 }
 
-// ─────────────────────────── player info ───────────────────────────
+// ─────────────────────────── players & names ───────────────────────────
 let activeSlots = [1, 2];
+let session = null;            // { id, mode, players:[{name}] } — id is null for keyboard test games
+const nameOf = (slot) => session?.players?.[slot - 1]?.name || `Player ${slot}`;
+
+function applyNames() {
+  for (const el of document.querySelectorAll('.pname')) el.querySelector('bdi').textContent = nameOf(+el.dataset.name);
+  game.setNames({ 1: nameOf(1), 2: nameOf(2) });
+}
+
 function info(slot, now) {
   const t = tracker.get(slot);
   if (!t) return { present: false, held: 0 };
-  const solo = activeSlots.length === 1 && flow.name !== 'attract';
-  const range = solo ? CONFIG.RANGE_SOLO : slot === 1 ? CONFIG.RANGE_P1 : CONFIG.RANGE_P2;
+  const range = activeSlots.length === 1 ? CONFIG.RANGE_SOLO : slot === 1 ? CONFIG.RANGE_P1 : CONFIG.RANGE_P2;
   const x01 = (t.fx - range[0]) / (range[1] - range[0]);
   // hand-raise timer only counts while the person is actually being seen right now
   const held = t.present && t.handUpSince != null && now - t.lastSeen < 250 ? now - t.handUpSince : 0;
-  const c = t.det?.cursor;
-  const cursor = c && c.valid && t.present ? { x: clamp((c.x - 0.15) / 0.7, 0, 1) * STAGE_W, y: clamp((c.y - 0.08) / 0.55, 0, 1) * STAGE_H } : null;
-  return { present: t.present, x01, held, cursor, lastSeen: t.lastSeen };
+  return { present: t.present, x01, held, lastSeen: t.lastSeen };
 }
 
 // ─────────────────────────── screens ───────────────────────────
@@ -107,21 +120,70 @@ function go(name, arg) {
   flow.since = performance.now();
 }
 
+function report(status, extra) { if (session?.id) link.status(session.id, status, extra); }
+
+// Esc: operator abandons the current group and returns to the idle screen
+function abortSession() {
+  if (session?.id) report(['countdown', 'play', 'results'].includes(flow.name) ? 'done' : 'noshow');
+  session = null;
+  go('idle');
+}
+
 const FLOWS = {
-  // ── 01 Attract / Join ──
-  attract() {
+  // ── Idle: "What to catch" + register on the tablet ──
+  idle() {
+    session = null;
     activeSlots = [1, 2];
-    tracker.setMode('open', [1, 2]);
     tracker.releaseAll();
-    show('scr-attract');
-    if (pose) $('pipWrap').classList.remove('hidden');
+    presence.reset();
+    show('scr-guide');
     $('cursors').innerHTML = '';
-    game.reset([1, 2]);
-    const ready = { 1: false, 2: false };
-    let bothSince = null, soloSince = null;
-    const ui = {
-      1: { el: $('slot1'), side: 'left' }, 2: { el: $('slot2'), side: 'right' },
+    document.querySelectorAll('.tile').forEach((t) => { t.style.animation = 'none'; void t.offsetWidth; t.style.animation = ''; });
+    let asking = false, lastAsk = 0;
+    const cta = $('registerCta');
+    const setCta = () => {
+      const off = !link.available;
+      cta.classList.toggle('offline', off || !link.online);
+      if (off) cta.replaceChildren(Object.assign(document.createElement('span'), { textContent: 'Press Enter to start a test game (Shift+Enter: one player)' }));
     };
+    setCta();
+    return {
+      update(dt, now) {
+        if (now - lastAsk > 1000) setCta();
+        // someone registered on the tablet → call them in
+        if (link.pending && !asking && now - lastAsk > 700) {
+          asking = true; lastAsk = now;
+          link.next().then((s) => {
+            asking = false;
+            if (s && flow.name === 'idle') startSession(s);
+          });
+        }
+      },
+      // Enter: test game without the tablet (Shift+Enter = one player)
+      skip(shift) {
+        startSession({ id: null, mode: shift ? 'single' : 'multi', players: shift ? [{ name: 'Player 1' }] : [{ name: 'Player 1' }, { name: 'Player 2' }] });
+      },
+      trackingOff: true,
+    };
+  },
+
+  // ── Join: the registered players step in and raise a hand ──
+  attract() {
+    const solo = session.mode === 'single';
+    activeSlots = solo ? [1] : [1, 2];
+    tracker.setMode('open', activeSlots);
+    tracker.releaseAll();
+    applyNames();
+    show('scr-attract');
+    $('slots').classList.toggle('single', solo);
+    $('joinLead').textContent = solo ? 'Step in front of the screen and raise one hand to start.' : 'Stand side by side and raise one hand to join.';
+    if (pose) $('pipWrap').classList.remove('hidden');
+    game.reset(activeSlots);
+    sfx.whoosh();
+    report('waiting');
+    const ready = { 1: false, 2: false };
+    let allSince = null;
+    const ui = { 1: { el: $('slot1'), side: solo ? 'front' : 'left' }, 2: { el: $('slot2'), side: 'right' } };
     const setSlot = (s, state, title, sub, prog) => {
       const u = ui[s];
       if (u.state !== state || u.title !== title) {
@@ -135,80 +197,61 @@ const FLOWS = {
     };
     return {
       update(dt, now) {
-        for (const s of [1, 2]) {
+        // removed from the queue on the tablet → back to idle
+        if (session.id && link.online && link.state && link.state.current?.id !== session.id) return go('idle');
+        for (const s of activeSlots) {
           const p = info(s, now);
           if (!p.present) {
             ready[s] = false;
             const far = presence.rejected.some((d) => d.reject === 'far' && tracker.sideOf(d.x) === s);
             if (far) setSlot(s, 'none', 'Come a bit closer', `Stand within ${CONFIG.MAX_DISTANCE_M} m`, 0);
-            else setSlot(s, 'none', `Step in on the ${ui[s].side}`, 'Stand on your side', 0);
+            else setSlot(s, 'none', solo ? 'Step in front of the screen' : `Step in on the ${ui[s].side}`, solo ? 'Stand in the middle' : 'Stand on your side', 0);
             continue;
           }
           if (!ready[s] && p.held >= CONFIG.HAND_RAISE_HOLD_MS) { ready[s] = true; sfx.join(s); }
           if (ready[s]) setSlot(s, 'ready', 'Ready', 'Hand detected', 1);
           else setSlot(s, 'present', 'Raise one hand', 'Hold it up to join', clamp(p.held / CONFIG.HAND_RAISE_HOLD_MS, 0, 1));
         }
-        const both = ready[1] && ready[2];
-        $('joinCheck').classList.toggle('on', both);
+        const readySlots = activeSlots.filter((s) => ready[s]);
+        const all = readySlots.length === activeSlots.length;
+        $('joinCheck').classList.toggle('on', all);
         const note = $('soloNote');
-        if (both) {
+        if (all) {
           note.textContent = "Great — let's play!";
-          bothSince ??= now;
-          if (now - bothSince > 900) go('guide', [1, 2]);
+          allSince ??= now;
+          if (now - allSince > 900) return go('countdown', activeSlots);
           return;
         }
-        bothSince = null;
-        const one = ready[1] ? 1 : ready[2] ? 2 : null;
-        const other = one === 1 ? 2 : 1;
-        if (one && !info(other, now).present && CONFIG.ALLOW_SOLO) {
-          soloSince ??= now;
-          const left = Math.ceil(CONFIG.SOLO_WAIT_SECONDS - (now - soloSince) / 1000);
-          note.textContent = `Waiting for Player ${other}… starting solo in ${left}`;
-          if (left <= 0) go('guide', [one]);
-        } else {
-          soloSince = null;
-          note.textContent = one ? `Player ${other}, raise one hand to join!` : '';
+        allSince = null;
+        // registered players who don't show up: move on
+        const left = Math.ceil(CONFIG.NO_SHOW_SECONDS - (now - this.since) / 1000);
+        if (left <= 0) {
+          if (readySlots.length) return go('countdown', readySlots); // play with whoever is ready
+          report('noshow');
+          session = null;
+          return go('idle');
         }
+        const waitingFor = activeSlots.filter((s) => !ready[s]).map(nameOf);
+        note.textContent = readySlots.length
+          ? `Waiting for ${waitingFor.join(' & ')} to raise a hand…`
+          : left <= 20 ? `Starting over in ${left} s if nobody joins` : '';
       },
-      skip() { // Enter: start with whoever is here (or both in keyboard mode)
-        const here = [1, 2].filter((s) => info(s, performance.now()).present);
-        go('guide', here.length ? here : [1, 2]);
-      },
+      skip() { go('countdown', activeSlots); },
       exit() { $('pipWrap').classList.add('hidden'); },
     };
   },
 
-  // ── 02 What to catch ──
-  guide(slots) {
-    activeSlots = slots;
-    tracker.setMode('locked', slots);
-    show('scr-guide');
-    // replay tile entrance animation
-    document.querySelectorAll('.tile').forEach((t) => { t.style.animation = 'none'; void t.offsetWidth; t.style.animation = ''; });
-    sfx.whoosh();
-    const dur = CONFIG.GUIDE_SECONDS * 1000;
-    let goneSince = null;
-    return {
-      update(dt, now) {
-        const p = clamp((now - this.since) / dur, 0, 1);
-        $('guideBar').style.width = `${p * 100}%`;
-        $('guideStart').textContent = `Game starts in ${Math.ceil((dur - (now - this.since)) / 1000)}`;
-        if (p >= 1) return go('countdown', slots);
-        if (abandoned(now)) { goneSince ??= now; if (now - goneSince > 4000) go('attract'); } else goneSince = null;
-      },
-      skip() { go('countdown', slots); },
-    };
-  },
-
-  // ── 03 Countdown (baskets already live so players can feel the controls) ──
+  // ── Countdown (baskets already live so players can feel the controls) ──
   countdown(slots) {
     activeSlots = slots;
     tracker.setMode('locked', slots);
     game.reset(slots);
+    applyNames();
     show('scr-countdown', { hud: true, field: true });
     updateHud(true);
     $('time').textContent = fmtTime(CONFIG.ROUND_SECONDS);
     $('timerCard').classList.remove('final');
+    report('countdown');
     let shown = null;
     const num = $('countNum'), dots = [...$('countDots').children];
     return {
@@ -232,9 +275,10 @@ const FLOWS = {
     };
   },
 
-  // ── 04 Gameplay ──
+  // ── Gameplay ──
   play(slots) {
     show('scr-none', { hud: true, field: true });
+    report('playing');
     let finalShown = false, lastSec = null, ending = null, goneSince = null;
     const total = CONFIG.ROUND_SECONDS;
     return {
@@ -253,59 +297,78 @@ const FLOWS = {
         }
         if (remaining <= 0 && !ending) { ending = now; banner("TIME'S UP!"); sfx.whoosh(); }
         if (ending && now - ending > 1500) return go('results', slots);
-        if (abandoned(now)) { goneSince ??= now; if (now - goneSince > CONFIG.ABANDON_MS) go('attract'); } else goneSince = null;
+        // everyone walked away mid-game: end the round early and show the scores
+        if (abandoned(now)) { goneSince ??= now; if (now - goneSince > CONFIG.ABANDON_MS && !ending) { ending = now; banner("TIME'S UP!"); } } else goneSince = null;
       },
+      skip() { go('results', slots); },
       draw: true,
     };
   },
 
-  // ── 05 Results ──
+  // ── Results (tracking off), then back to idle for the next group ──
   results(slots) {
     show('scr-results');
     $('timerCard').classList.remove('final');
     const sc = game.scores;
     const h1 = $('winnerText');
+    const bdi = (t) => Object.assign(document.createElement('bdi'), { textContent: t });
     let winner = null;
-    if (slots.length === 1) { h1.textContent = 'Great catching!'; h1.className = `p${slots[0]}`; winner = slots[0]; }
-    else if (sc[1].score === sc[2].score) { h1.textContent = "It's a tie!"; h1.className = ''; }
-    else { winner = sc[1].score > sc[2].score ? 1 : 2; h1.textContent = `Player ${winner} wins!`; h1.className = `p${winner}`; }
-    $('resultCards').innerHTML = slots.map((s) => {
+    if (slots.length === 1) { winner = slots[0]; h1.replaceChildren(`Great catching, `, bdi(nameOf(winner)), '!'); h1.className = `p${winner}`; }
+    else if (sc[1].score === sc[2].score) { h1.replaceChildren("It's a tie!"); h1.className = ''; }
+    else { winner = sc[1].score > sc[2].score ? 1 : 2; h1.replaceChildren(bdi(nameOf(winner)), ' wins!'); h1.className = `p${winner}`; }
+    const cards = $('resultCards'); cards.replaceChildren();
+    for (const s of slots) {
       const r = sc[s], acc = r.correct + r.wrong ? Math.round((r.correct / (r.correct + r.wrong)) * 100) : 0;
-      return `<div class="rcard ${winner === s && slots.length > 1 ? 'win' : ''}">
-        ${winner === s && slots.length > 1 ? '<div class="crown">WINNER</div>' : ''}
-        <div class="row"><div><div class="hud-label"><span class="mark p${s}"></span>PLAYER ${s}</div><div class="hud-sub">CORRECT CATCHES</div></div><div class="big">${r.score}</div></div>
-        <div class="stats"><span>Accuracy <b>${acc}%</b></span><span>Best streak <b>${r.best}</b></span><span>Bonus <b>${r.bonus}</b></span></div>
-      </div>`;
-    }).join('');
+      const card = document.createElement('div');
+      card.className = `rcard ${winner === s && slots.length > 1 ? 'win' : ''}`;
+      card.innerHTML = `${winner === s && slots.length > 1 ? '<div class="crown">WINNER</div>' : ''}
+        <div class="row"><div><div class="hud-label pname"><span class="mark p${s}"></span><bdi></bdi></div><div class="hud-sub">CORRECT CATCHES</div></div><div class="big">${r.score}</div></div>
+        <div class="stats"><span>Accuracy <b>${acc}%</b></span><span>Best streak <b>${r.best}</b></span><span>Bonus <b>${r.bonus}</b></span></div>`;
+      card.querySelector('bdi').textContent = nameOf(s);
+      cards.append(card);
+    }
+    // send the scores back to the tablet / registrations.csv (one entry per registered player)
+    const count = session?.players?.length || slots.length;
+    const results = Array.from({ length: count }, (_, i) => {
+      const r = sc[i + 1];
+      return { name: nameOf(i + 1), score: r?.score ?? 0, correct: r?.correct ?? 0, wrong: r?.wrong ?? 0, best: r?.best ?? 0 };
+    });
+    report('results', { results, winner: slots.length > 1 && winner ? winner - 1 : null });
+
     sfx.fanfare();
-    // confetti in the winner's colour
     const cols = winner ? [PLAYER[winner].color, PLAYER[winner].light, '#FFD15C', '#ffffff'] : ['#2563EB', '#0AA5C7', '#FFD15C', '#ffffff'];
     for (let i = 0; i < 6; i++) setTimeout(() => game.burst(200 + Math.random() * (STAGE_W - 400), STAGE_H, cols, 40, 2.1), i * 180);
 
-    // Tracking is switched off on the results screen: players are released, no cursors,
-    // and body detection pauses. It comes back when the game restarts at the join screen.
+    // Tracking is switched off on the results screen: players are released and body
+    // detection pauses. It comes back when the next registered group is called in.
     tracker.releaseAll();
     presence.reset();
-    $('cursors').innerHTML = '';
     const btn = $('playAgain'), fill = btn.querySelector('.fill'), label = btn.querySelector('.label'), hint = $('resultsHint');
     btn.classList.add('timer');
-    btn.onclick = () => go('attract');
-    hint.textContent = 'Next players: get ready to step in and raise a hand';
+    btn.onclick = () => finish();
+    hint.textContent = link.state?.queue?.length ? `Up next: ${link.state.queue[0].players.map((p) => p.name).join(' & ')}` : 'Next players: register on the tablet';
+    hint.dir = 'auto';
     const total = CONFIG.RESULTS_IDLE_SECONDS * 1000;
+    const finish = () => { report('done'); session = null; go('idle'); };
     return {
       update(dt, now) {
         game.update(dt, { spawning: false });
         const el = now - this.since;
         fill.style.width = `${clamp(el / total, 0, 1) * 100}%`;
-        label.textContent = `New game in ${Math.max(0, Math.ceil((total - el) / 1000))}`;
-        if (el >= total) go('attract');
+        label.textContent = `Next game in ${Math.max(0, Math.ceil((total - el) / 1000))}`;
+        if (el >= total) finish();
       },
-      skip() { go('attract'); },
-      exit() { btn.onclick = null; btn.classList.remove('timer'); fill.style.width = '0'; label.textContent = 'Play again'; },
+      skip() { finish(); },
+      exit() { btn.onclick = null; btn.classList.remove('timer'); fill.style.width = '0'; },
       draw: true, particlesOnly: true, trackingOff: true,
     };
   },
 };
+
+function startSession(s) {
+  session = { id: s.id, mode: s.mode === 'single' ? 'single' : 'multi', players: s.players || [] };
+  go('attract');
+}
 
 function abandoned(now) { return activeSlots.every((s) => !info(s, now).present); }
 
@@ -393,6 +456,17 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// ─────────────────────────── tablet link + QR on the idle screen ───────────────────────────
+function showTabletLink() {
+  const url = link.info?.tabletUrls?.[0];
+  if (!url) return;
+  const qr = qrcode(0, 'M');
+  qr.addData(url); qr.make();
+  $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+  $('tabletUrl').textContent = url.replace(/^http:\/\//, '').replace(/\/$/, '');
+  $('tabletLink').classList.remove('hidden');
+}
+
 // ─────────────────────────── boot ───────────────────────────
 const loadImg = (src) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => { console.warn('missing', src); res(null); }; i.src = src; });
 
@@ -415,7 +489,7 @@ async function boot() {
   if (document.fonts?.ready) await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]);
   game = new Game($('game'), images, sfx);
   buildGuide();
-  if (CONFIG.DEBUG) Object.assign(window, { __game: game, __tracker: tracker, __presence: presence, __go: go });
+  if (CONFIG.DEBUG) Object.assign(window, { __game: game, __tracker: tracker, __presence: presence, __go: go, __link: link, __showTabletLink: showTabletLink });
 
   const forceKeyboard = new URLSearchParams(location.search).has('keyboard');
   if (!forceKeyboard) {
@@ -439,7 +513,9 @@ async function boot() {
 
   $('boot').classList.add('fade');
   setTimeout(() => $('boot').classList.add('hidden'), 700);
-  go('attract');
+  await link.start();
+  showTabletLink();
+  go('idle');
   if (sim.on) toast('Keyboard mode — P1: A/D + W   ·   P2: ←/→ + ↑   ·   Enter to skip', 5000);
   sfx.ensure();
   if (!sfx.ready) setTimeout(() => { if (!sfx.ready) toast('Click anywhere to turn on sound', 4000); }, 1200);

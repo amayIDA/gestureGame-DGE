@@ -68,7 +68,8 @@ export class IdTracker {
 
   releaseAll() { this.slots = { 1: null, 2: null }; }
 
-  sideOf(x) { return x < 0.5 ? 1 : 2; }
+  // two players: left half = Player 1, right half = Player 2. One player: anywhere.
+  sideOf(x) { return this.activeSlots.length === 1 ? this.activeSlots[0] : x < 0.5 ? 1 : 2; }
 
   predict(track, now) {
     const dt = Math.min(0.5, (now - track.lastSeen) / 1000);

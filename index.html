@@ -4,8 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Catch the Target — SCAD</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/fonts.css" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -22,7 +21,7 @@
       <div id="hud" class="hidden">
         <div class="hud-card hud-player" data-slot="1">
           <div class="hud-text">
-            <div class="hud-label"><span class="mark p1"></span>PLAYER 1</div>
+            <div class="hud-label pname" data-name="1"><span class="mark p1"></span><bdi>PLAYER 1</bdi></div>
             <div class="hud-sub">CORRECT CATCHES</div>
           </div>
           <div class="hud-score" id="score1">0</div>
@@ -42,7 +41,7 @@
         </div>
         <div class="hud-card hud-player" data-slot="2">
           <div class="hud-text">
-            <div class="hud-label"><span class="mark p2"></span>PLAYER 2</div>
+            <div class="hud-label pname" data-name="2"><span class="mark p2"></span><bdi>PLAYER 2</bdi></div>
             <div class="hud-sub">CORRECT CATCHES</div>
           </div>
           <div class="hud-score" id="score2">0</div>
@@ -54,11 +53,11 @@
       <section class="screen" id="scr-attract">
         <img class="title" src="assets/ui/title-catch-the-target.png" alt="Catch the Target" />
         <div class="glass panel join-panel">
-          <p class="lead">Stand side by side and raise one hand to join.</p>
+          <p class="lead" id="joinLead">Stand side by side and raise one hand to join.</p>
           <p class="sub">Catch items related to SCAD. Let unrelated items fall past.</p>
-          <div class="slots">
+          <div class="slots" id="slots">
             <div class="slot" id="slot1">
-              <div class="slot-head"><span class="mark p1"></span>PLAYER 1</div>
+              <div class="slot-head pname" data-name="1"><span class="mark p1"></span><bdi>PLAYER 1</bdi></div>
               <div class="slot-body">
                 <div class="hand">
                   <svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" class="ring-bg"/><circle cx="32" cy="32" r="29" class="ring-fg"/></svg>
@@ -69,7 +68,7 @@
             </div>
             <div class="join-check" id="joinCheck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
             <div class="slot" id="slot2">
-              <div class="slot-head"><span class="mark p2"></span>PLAYER 2</div>
+              <div class="slot-head pname" data-name="2"><span class="mark p2"></span><bdi>PLAYER 2</bdi></div>
               <div class="slot-body">
                 <div class="hand">
                   <svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" class="ring-bg"/><circle cx="32" cy="32" r="29" class="ring-fg"/></svg>
@@ -92,9 +91,16 @@
             <div class="guide-col bad"><h3><span class="pill no">✕</span>LET THESE FALL PAST</h3><div class="grid" id="gridAvoid"></div></div>
           </div>
           <div class="guide-foot">
-            <div class="guide-rules"><b>+1</b> per SCAD item &nbsp;·&nbsp; <b class="neg">−1</b> for an unrelated item &nbsp;·&nbsp; <b class="gold">+3</b> golden bonus star &nbsp;·&nbsp; <b>+1</b> every 5 in a row</div>
-            <div class="progress"><div class="bar" id="guideBar"></div></div>
-            <div class="guide-start" id="guideStart">Get ready…</div>
+            <div class="guide-cta">
+              <div class="guide-rules"><b>+1</b> per SCAD item &nbsp;·&nbsp; <b class="neg">−1</b> for an unrelated item &nbsp;·&nbsp; <b class="gold">+3</b> golden bonus star &nbsp;·&nbsp; <b>+1</b> every 5 in a row</div>
+              <div class="register-cta" id="registerCta">
+                <span>Register on the tablet to play</span><i></i><span class="ar" dir="rtl">سجّل على الجهاز اللوحي للعب</span>
+              </div>
+            </div>
+            <div class="tablet-link hidden" id="tabletLink">
+              <div class="qr" id="qr"></div>
+              <div class="tablet-url"><span>Tablet link</span><b id="tabletUrl"></b></div>
+            </div>
           </div>
         </div>
       </section>

@@ -3,3 +3,5 @@ __pycache__/
 assets/_source/
 launcher-src/game/
 launcher-src/dist/
+registrations.csv
+windows/registrations.csv

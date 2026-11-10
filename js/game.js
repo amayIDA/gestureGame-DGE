@@ -40,6 +40,7 @@ export class Game {
     this.images = images; this.sfx = sfx;
     this.sprites = new Map();
     this.buildSprites();
+    this.names = { 1: 'P1', 2: 'P2' };
     this.catchBag = new Bag(CATCH_ITEMS);
     this.avoidBag = new Bag(AVOID_ITEMS);
     this.reset([1, 2]);
@@ -77,11 +78,21 @@ export class Game {
     }
     g.restore();
     // label
-    let fs = 21; g.font = `700 ${fs}px Inter, "Segoe UI", system-ui, sans-serif`;
-    while (g.measureText(label).width > CARD_W - 14 && fs > 12) { fs--; g.font = `700 ${fs}px Inter, "Segoe UI", system-ui, sans-serif`; }
+    let fs = 21; g.font = `700 ${fs}px Inter, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif`;
+    while (g.measureText(label).width > CARD_W - 14 && fs > 12) { fs--; g.font = `700 ${fs}px Inter, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif`; }
     g.fillStyle = gold ? '#7A4B00' : '#12325F'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(label, CARD_W / 2, CARD_H - 21);
     return { canvas: cv, s };
+  }
+
+  // label under each basket: the player's (short) name, English or Arabic
+  setNames(names) {
+    for (const s of [1, 2]) {
+      const n = (names[s] || `P${s}`).trim();
+      const first = n.split(' ')[0];
+      const short = first.length >= 3 ? first : n;
+      this.names[s] = [...short].length > 12 ? [...short].slice(0, 11).join('') + '…' : short;
+    }
   }
 
   reset(slots) {
@@ -266,7 +277,7 @@ export class Game {
       const a = clamp(t.life / (t.max * 0.5), 0, 1);
       const pop = 1 + Math.max(0, (t.life - t.max + 0.12) / 0.12) * 0.4;
       g.save(); g.globalAlpha = a; g.translate(t.x, t.y); g.scale(pop, pop);
-      g.font = `800 ${t.size}px Inter, "Segoe UI", system-ui, sans-serif`;
+      g.font = `800 ${t.size}px Inter, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.lineWidth = Math.max(4, t.size / 9); g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineJoin = 'round';
       g.strokeText(t.str, 0, 0); g.fillStyle = t.color; g.fillText(t.str, 0, 0);
@@ -323,13 +334,16 @@ export class Game {
     g.restore();
     g.save(); g.globalAlpha = b.present ? 1 : 0.6;
     const px = b.x + shakeX, py = BASKET_Y + H / 2 + 44;
-    g.fillStyle = P.color; roundRect(g, px - 44, py - 20, 88, 40, 20); g.fill();
+    g.font = '800 22px Inter, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif';
+    const label = this.names[s] || P.tag;
+    const pw = Math.max(88, g.measureText(label).width + 40);
+    g.fillStyle = P.color; roundRect(g, px - pw / 2, py - 20, pw, 40, 20); g.fill();
     g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,0.95)'; g.stroke();
-    g.fillStyle = '#fff'; g.font = '800 22px Inter, "Segoe UI", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(P.tag, px, py + 1);
+    g.fillStyle = '#fff'; g.font = '800 22px Inter, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(label, px, py + 1);
     if (!b.present) {
       g.globalAlpha = 0.6 + Math.sin(this.time * 6) * 0.3;
-      g.font = '700 26px Inter, "Segoe UI", system-ui, sans-serif'; g.fillStyle = '#12325F';
+      g.font = '700 26px Inter, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif'; g.fillStyle = '#12325F';
       g.fillText('Step back into view', px, BASKET_Y - BASKET_H - 20);
     }
     g.restore();
@@ -352,7 +366,7 @@ function drawStar(g, cx, cy, R, r) {
   g.shadowColor = 'rgba(230,160,0,0.6)'; g.shadowBlur = 12;
   g.fillStyle = gr; g.fill();
   g.shadowBlur = 0; g.lineWidth = 3; g.strokeStyle = '#fff'; g.stroke();
-  g.fillStyle = '#fff'; g.font = '900 24px Inter, "Segoe UI", system-ui, sans-serif';
+  g.fillStyle = '#fff'; g.font = '900 24px Inter, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('+3', cx, cy + 3);
   g.restore();
 }

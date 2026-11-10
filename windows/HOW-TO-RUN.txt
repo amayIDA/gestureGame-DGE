@@ -1,16 +1,32 @@
 CATCH THE TARGET - Windows
 
-1. Copy CatchTheTarget.exe (and settings.txt, optional) to the Windows PC.
-   The game is fully inside the .exe - nothing else is needed.
-2. Plug in a webcam.
-3. Double-click CatchTheTarget.exe.
-   - First time only: if Windows shows "Windows protected your PC",
-     click "More info" -> "Run anyway".
-   - If no Chrome or Edge is found it installs Google Chrome automatically
-     (internet needed for that step only).
-4. The game opens full screen. Close it with Alt+F4.
+SETUP (once)
+1. Copy this whole "windows" folder to the game PC
+   (CatchTheTarget.bat, CatchTheTarget.exe, settings.txt).
+2. Plug in a webcam. Connect the PC and the tablet to the SAME Wi-Fi/network.
 
-Keys: K = keyboard mode, C = camera view, Shift+D = debug,
-      Enter = skip screen, Esc = back to start, M = mute.
+EVERY DAY
+1. Double-click CatchTheTarget.bat
+   - First time only: click "Yes" on the Windows prompt (lets the tablet connect),
+     and if Windows shows "Windows protected your PC": More info -> Run anyway.
+   - If no Chrome or Edge is found, Google Chrome is installed automatically.
+2. The game opens full screen on the "What to catch" screen.
+   The black window shows the TABLET LINK, e.g.  http://192.168.1.42:7420/register/
+   (it is also printed small, with a QR code, at the bottom-right of the game screen).
+3. On the tablet, open that link in Safari/Chrome (scan the QR code or type it).
+   Tip: Share -> "Add to Home Screen" so it opens full screen like an app.
+4. Players register on the tablet (one player or two). The game calls them in
+   by name, they raise a hand, and the 60-second round starts.
+
+Close the game with Alt+F4. Keep the black window open while playing.
+
+REGISTRATIONS + SCORES are saved in registrations.csv next to the .exe
+(opens in Excel, Arabic names included).
+
+PORTS: the game uses port 7420 only. Other apps using 3000 / 5173 are not affected.
+To use another port, set  port=7421  in settings.txt.
+
+Keys on the game PC: Esc = skip current players, Enter = skip a screen /
+start a test game, C = camera view, Shift+D = debug, K = keyboard mode, M = mute.
 
 Problems? See %LOCALAPPDATA%\CatchTheTarget\launcher.log

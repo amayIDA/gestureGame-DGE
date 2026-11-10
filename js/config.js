@@ -7,16 +7,14 @@ const bool = (k, d) => (params.has(k) ? params.get(k) !== '0' && params.get(k) !
 
 export const CONFIG = {
   // Flow timings
-  ROUND_SECONDS: num('round', 30),          // storyboard shows 0:30
-  GUIDE_SECONDS: num('guide', 8),           // "What to catch" screen
+  ROUND_SECONDS: num('round', 60),          // 60-second rounds
   COUNTDOWN_FROM: 3,
-  RESULTS_IDLE_SECONDS: num('idle', 15),    // results shown (tracking off), then back to join
+  RESULTS_IDLE_SECONDS: num('idle', 15),    // results shown (tracking off), then back to the idle screen
   HAND_RAISE_HOLD_MS: num('hold', 700),     // raise-hand hold to join
   FINAL_SECONDS: 10,
-
-  // Solo fallback: if one player is ready and nobody is on the other side
-  ALLOW_SOLO: bool('solo', true),
-  SOLO_WAIT_SECONDS: num('solowait', 6),
+  // Registered players who don't come to the screen: after this long the game moves on
+  // (starts with whoever is ready, or calls the next group if nobody is)
+  NO_SHOW_SECONDS: num('noshow', 60),
 
   // Body tracking
   MODEL: params.get('model') || 'full',     // 'full' (accurate) or 'lite' (faster machines)
