@@ -11,9 +11,12 @@
 <body>
   <div id="viewport">
     <div id="stage">
-      <div class="bg"></div>
+      <video class="bg" id="bgVideo" poster="assets/ui/background-poster.jpg" autoplay muted loop playsinline preload="auto">
+        <source src="assets/ui/background.mp4" type="video/mp4" />
+        <source src="assets/ui/background.webm" type="video/webm" />
+      </video>
       <div id="playfield" class="glass hidden"></div>
-      <canvas id="game" width="1920" height="1080"></canvas>
+      <canvas id="game" width="1536" height="762"></canvas>
 
       <!-- HUD (countdown + gameplay) -->
       <div id="hud" class="hidden">

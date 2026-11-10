@@ -2,6 +2,9 @@
 
 Two players stand side by side in front of a webcam. Each player's basket follows their body left and right. They catch SCAD-related items (statistics, census, data…) and let unrelated ones (frying pan, perfume…) fall past.
 
+## Display
+The game renders at **1536 × 762**. On a screen with that resolution it fills the screen exactly; on any other screen it scales to fit and keeps its shape, with thin bars if needed. The background on every screen is a looping skyline video (`assets/ui/background.mp4`, with a WebM fallback and a poster frame).
+
 ## Run it
 
 **Windows, one file:** copy `windows/CatchTheTarget.exe` to the PC and double-click it. The whole game is built into the .exe, so no Python or anything else is needed. If neither Chrome nor Edge is installed, it installs Chrome automatically (via winget, or Google's installer). It also warns if no webcam is plugged in, then opens the game full-screen. Optional `settings.txt` next to the exe changes round length, model, etc. Logs go to `%LOCALAPPDATA%\CatchTheTarget\launcher.log`. After changing the game, rebuild the exe with `launcher-src/build.sh` (needs Go).
@@ -72,7 +75,7 @@ js/pose.js        camera + MediaPipe Pose Landmarker
 js/audio.js       synthesized sounds (no audio files)
 js/config.js      all tunables
 assets/items/     60 item images from Figma (catch/ and avoid/)
-assets/ui/        background, title from Figma
+assets/ui/        background video (+ webm fallback, poster), title
 assets/figma/     raw exports from the Figma file
 vendor/           MediaPipe tasks-vision 0.10.35 + pose models (full, lite)
 ```

@@ -2,7 +2,7 @@
 // 01 Attract/Join → 02 What to catch → 03 Countdown → 04 Gameplay → 05 Results (tracking off) → 01 Attract
 import { CONFIG } from './config.js';
 import { CATCH_ITEMS, AVOID_ITEMS, ALL_ITEMS, UI } from './items.js';
-import { Game, PLAYER } from './game.js';
+import { Game, PLAYER, STAGE_W, STAGE_H } from './game.js';
 import { IdTracker } from './idtracker.js';
 import { PresenceFilter } from './presence.js';
 import { Sfx } from './audio.js';
@@ -21,8 +21,9 @@ const images = {};
 
 // ─────────────────────────── stage scaling ───────────────────────────
 function fit() {
-  scale = Math.min(innerWidth / 1920, innerHeight / 1080);
-  stage.style.transform = `translate(${(innerWidth - 1920 * scale) / 2}px, ${(innerHeight - 1080 * scale) / 2}px) scale(${scale})`;
+  // fixed 1536×762 aspect; fills a 1536×762 screen exactly, letterboxes on others
+  scale = Math.min(innerWidth / STAGE_W, innerHeight / STAGE_H);
+  stage.style.transform = `translate(${(innerWidth - STAGE_W * scale) / 2}px, ${(innerHeight - STAGE_H * scale) / 2}px) scale(${scale})`;
 }
 addEventListener('resize', fit);
 
@@ -85,7 +86,7 @@ function info(slot, now) {
   // hand-raise timer only counts while the person is actually being seen right now
   const held = t.present && t.handUpSince != null && now - t.lastSeen < 250 ? now - t.handUpSince : 0;
   const c = t.det?.cursor;
-  const cursor = c && c.valid && t.present ? { x: clamp((c.x - 0.15) / 0.7, 0, 1) * 1920, y: clamp((c.y - 0.08) / 0.55, 0, 1) * 1080 } : null;
+  const cursor = c && c.valid && t.present ? { x: clamp((c.x - 0.15) / 0.7, 0, 1) * STAGE_W, y: clamp((c.y - 0.08) / 0.55, 0, 1) * STAGE_H } : null;
   return { present: t.present, x01, held, cursor, lastSeen: t.lastSeen };
 }
 
@@ -279,7 +280,7 @@ const FLOWS = {
     sfx.fanfare();
     // confetti in the winner's colour
     const cols = winner ? [PLAYER[winner].color, PLAYER[winner].light, '#FFD15C', '#ffffff'] : ['#2563EB', '#0AA5C7', '#FFD15C', '#ffffff'];
-    for (let i = 0; i < 6; i++) setTimeout(() => game.burst(200 + Math.random() * 1520, 1080, cols, 40, 2.1), i * 180);
+    for (let i = 0; i < 6; i++) setTimeout(() => game.burst(200 + Math.random() * (STAGE_W - 400), STAGE_H, cols, 40, 2.1), i * 180);
 
     // Tracking is switched off on the results screen: players are released, no cursors,
     // and body detection pauses. It comes back when the game restarts at the join screen.
@@ -387,7 +388,7 @@ function frame(now) {
 
   flow.update?.(dt, now);
   if (flow.draw) game.draw({ showItems: !flow.particlesOnly, showBaskets: !flow.particlesOnly });
-  else game.ctx.clearRect(0, 0, 1920, 1080);
+  else game.clear();
   drawPip(); drawDebug(now);
   requestAnimationFrame(frame);
 }
@@ -404,11 +405,13 @@ function buildGuide() {
 async function boot() {
   fit();
   if (CONFIG.KIOSK) document.body.classList.add('kiosk');
+  const bg = $('bgVideo');
+  bg.play?.().catch(() => {}); // muted autoplay; poster frame shows until it starts
   if (CONFIG.DEBUG) $('debug').classList.remove('hidden');
   const msg = (m, hint = '') => { $('bootMsg').textContent = m; $('bootHint').innerHTML = hint; };
 
   msg('Loading artwork…');
-  await Promise.all([...ALL_ITEMS.map((it) => it.src), UI.title, UI.background].map(async (src) => { images[src] = await loadImg(src); }));
+  await Promise.all([...ALL_ITEMS.map((it) => it.src), UI.title].map(async (src) => { images[src] = await loadImg(src); }));
   if (document.fonts?.ready) await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]);
   game = new Game($('game'), images, sfx);
   buildGuide();

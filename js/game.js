@@ -1,9 +1,13 @@
-// Gameplay layer: falling items, baskets, scoring, juice. Draws on a 1920×1080 canvas.
+// Gameplay layer: falling items, baskets, scoring, juice.
+// Output resolution is 1536×762. Layout is written in "design units" with the same aspect
+// (2177×1080) so sizes read naturally; the canvas scales them down to 1536×762 when drawing.
 import { CONFIG } from './config.js';
 import { CATCH_ITEMS, AVOID_ITEMS } from './items.js';
 
-export const STAGE_W = 1920, STAGE_H = 1080;
-export const PF = { x: 60, y: 176, w: 1800, h: 864 };          // glass playfield (from storyboard)
+export const RENDER_W = 1536, RENDER_H = 762;                   // output resolution
+export const STAGE_H = 1080, STAGE_W = Math.round(STAGE_H * RENDER_W / RENDER_H); // 2177 design units
+const R = RENDER_W / STAGE_W;                                    // design units → pixels
+export const PF = { x: 60, y: 176, w: STAGE_W - 120, h: 864 };   // glass playfield (from storyboard)
 export const PLAYER = {
   1: { color: '#2563EB', light: '#7FB0FF', name: 'PLAYER 1', tag: 'P1' },
   2: { color: '#0AA5C7', light: '#7FE3F5', name: 'PLAYER 2', tag: 'P2' },
@@ -31,7 +35,8 @@ class Bag { // shuffle-bag so the same item doesn't repeat back-to-back
 
 export class Game {
   constructor(canvas, images, sfx) {
-    this.c = canvas; this.ctx = canvas.getContext('2d');
+    this.c = canvas; canvas.width = RENDER_W; canvas.height = RENDER_H;
+    this.ctx = canvas.getContext('2d');
     this.images = images; this.sfx = sfx;
     this.sprites = new Map();
     this.buildSprites();
@@ -72,7 +77,7 @@ export class Game {
     }
     g.restore();
     // label
-    let fs = 18; g.font = `700 ${fs}px Inter, "Segoe UI", system-ui, sans-serif`;
+    let fs = 21; g.font = `700 ${fs}px Inter, "Segoe UI", system-ui, sans-serif`;
     while (g.measureText(label).width > CARD_W - 14 && fs > 12) { fs--; g.font = `700 ${fs}px Inter, "Segoe UI", system-ui, sans-serif`; }
     g.fillStyle = gold ? '#7A4B00' : '#12325F'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(label, CARD_W / 2, CARD_H - 21);
@@ -223,6 +228,7 @@ export class Game {
   // ── drawing ──
   draw({ showItems = true, showBaskets = true } = {}) {
     const g = this.ctx;
+    g.setTransform(R, 0, 0, R, 0, 0);
     g.clearRect(0, 0, STAGE_W, STAGE_H);
 
     // lane divider + lane tint
@@ -241,8 +247,11 @@ export class Game {
       }
     }
 
-    if (showItems) for (const it of this.items) {
-      if (it.state !== 'caught') this.drawItem(it);
+    if (showItems) {
+      // items enter from and leave through the playfield frame
+      g.save(); roundRect(g, PF.x, PF.y, PF.w, PF.h, 30); g.clip();
+      for (const it of this.items) if (it.state !== 'caught') this.drawItem(it);
+      g.restore();
     }
     if (showBaskets) for (const s of this.slots) this.drawBasket(s);
     if (showItems) for (const it of this.items) if (it.state === 'caught') this.drawItem(it);
@@ -264,6 +273,8 @@ export class Game {
       g.restore();
     }
   }
+
+  clear() { this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.clearRect(0, 0, RENDER_W, RENDER_H); }
 
   drawItem(it) {
     const g = this.ctx;

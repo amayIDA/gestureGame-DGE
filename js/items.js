@@ -23,6 +23,7 @@ export const AVOID_ITEMS = build(AVOID, 'avoid');
 export const ALL_ITEMS = [...CATCH_ITEMS, ...AVOID_ITEMS];
 
 export const UI = {
-  background: 'assets/ui/background.jpg',
+  background: 'assets/ui/background.mp4',
+  backgroundPoster: 'assets/ui/background-poster.jpg',
   title: 'assets/ui/title-catch-the-target.png',
 };
