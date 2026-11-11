@@ -14,7 +14,7 @@ let idleTimer = null, thanksTimer = null;
 
 // ── helpers ──
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const bi = (en, ar) => { const f = document.createDocumentFragment(); f.append(el('span', '', en)); const a = el('span', 'ar', ar); a.dir = 'rtl'; f.append(a); return f; };
+const txt = (en) => el('span', '', en);
 async function api(path, body) {
   const r = await fetch('/api/' + path, body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   let data = null; try { data = await r.json(); } catch { /* empty */ }
@@ -60,20 +60,17 @@ function openStep() {
   nameIn.value = players[step].name; emailIn.value = players[step].email; syncFilled();
   const chip = $('stepChip'); chip.replaceChildren(); chip.className = 'step' + (step === 1 ? ' p2' : '');
   if (mode === 'multi') {
-    chip.append(el('span', 'pdot'), bi(`Player ${step + 1} of 2`, `اللاعب ${step + 1} من 2`));
-    chip.insertBefore(el('span', 'sep', '|'), chip.lastChild);
+    chip.append(el('span', 'pdot'), txt(`Player ${step + 1} of 2`));
   } else {
-    chip.append(el('span', 'pdot'), bi('Single player', 'لاعب واحد'));
-    chip.insertBefore(el('span', 'sep', '|'), chip.lastChild);
+    chip.append(el('span', 'pdot'), txt('Single player'));
   }
   const last = step === players.length - 1;
   $('nextEn').textContent = last ? 'Submit' : 'Next';
-  $('nextAr').textContent = last ? 'إرسال' : 'التالي';
   show('form');
 }
 
-function fieldError(id, en, ar) {
-  const e = $(id + 'Err'); e.replaceChildren(bi(en, ar));
+function fieldError(id, en) {
+  const e = $(id + 'Err'); e.replaceChildren(txt(en));
   $(id).closest('.field').classList.add('invalid');
 }
 
@@ -81,8 +78,8 @@ function collect() {
   const name = nameIn.value.replace(/\s+/g, ' ').trim();
   const email = emailIn.value.trim();
   let ok = true;
-  if (!name) { fieldError('name', 'Please enter a name', 'يرجى إدخال الاسم'); ok = false; }
-  if (email && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(email)) { fieldError('email', 'Please check the email address', 'يرجى التحقق من البريد الإلكتروني'); ok = false; }
+  if (!name) { fieldError('name', 'Please enter a name'); ok = false; }
+  if (email && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(email)) { fieldError('email', 'Please check the email address'); ok = false; }
   if (ok) Object.assign(reg.players[reg.step], { name, email });
   return ok;
 }
@@ -110,15 +107,15 @@ async function next() {
       const err = r.data?.error;
       if (err === 'name_required' || err === 'bad_email') {
         reg.step = (r.data.player || 1) - 1; openStep();
-        err === 'name_required' ? fieldError('name', 'Please enter a name', 'يرجى إدخال الاسم') : fieldError('email', 'Please check the email address', 'يرجى التحقق من البريد الإلكتروني');
-      } else if (err === 'queue_full') formMsg('The queue is full — please wait a moment.', 'قائمة الانتظار ممتلئة — يرجى الانتظار قليلًا.');
-      else formMsg('Something went wrong. Please try again.', 'حدث خطأ. يرجى المحاولة مرة أخرى.');
+        err === 'name_required' ? fieldError('name', 'Please enter a name') : fieldError('email', 'Please check the email address');
+      } else if (err === 'queue_full') formMsg('The queue is full — please wait a moment.');
+      else formMsg('Something went wrong. Please try again.');
     }
   } catch {
-    formMsg("Can't reach the game computer. Check the Wi-Fi and try again.", 'تعذّر الاتصال بجهاز اللعبة. تحقّق من الشبكة وحاول مرة أخرى.');
+    formMsg("Can't reach the game computer. Check the Wi-Fi and try again.");
   } finally { btn.disabled = false; }
 }
-function formMsg(en, ar) { const m = $('formMsg'); m.replaceChildren(el('span', '', en)); const a = el('span', 'ar', ar); a.dir = 'rtl'; m.append(a); }
+function formMsg(en) { $('formMsg').replaceChildren(txt(en)); }
 
 // ── thank you ──
 function renderThanks() {
@@ -131,14 +128,14 @@ function renderTurn() {
   t.className = 'turn';
   if (state.current?.id === lastReg.id) {
     t.classList.add('go');
-    t.replaceChildren(bi("It's your turn! Go to the screen and raise one hand.", 'حان دورك! توجّه إلى الشاشة وارفع يدك.'));
+    t.replaceChildren(txt("It's your turn! Go to the screen and raise one hand."));
     return;
   }
   const i = state.queue.findIndex((s) => s.id === lastReg.id);
   if (i < 0) { t.replaceChildren(); return; }
   const ahead = i + (state.current ? 1 : 0);
-  if (ahead === 0) t.replaceChildren(bi("You're next! Go to the screen.", 'أنت التالي! توجّه إلى الشاشة.'));
-  else t.replaceChildren(bi(`${ahead} ${ahead === 1 ? 'group' : 'groups'} ahead of you`, `عدد المجموعات قبلك: ${ahead}`));
+  if (ahead === 0) t.replaceChildren(txt("You're next! Go to the screen."));
+  else t.replaceChildren(txt(`${ahead} ${ahead === 1 ? 'group' : 'groups'} ahead of you`));
 }
 $('doneBtn').onclick = reset;
 
