@@ -1,7 +1,8 @@
 // Decides which detected bodies are real, nearby players before they reach the ID tracker.
 //
-//  • Too far:  anyone estimated further than MAX_DISTANCE_M is ignored. Someone already
-//              playing gets 15% extra leeway so they don't flicker at the boundary.
+//  • Distance: only people between MIN_DISTANCE_M and MAX_DISTANCE_M from the camera count.
+//              Someone already accepted gets 15% extra leeway at both limits so they don't
+//              flicker on and off at the boundary.
 //  • Static:   photos, posters, statues and people on a TV are still detected by the pose model,
 //              but their skeleton never really moves. Every body has to "prove it's alive"
 //              by moving a little (walking in, raising a hand, swaying) before it can play.
@@ -28,8 +29,8 @@ const SYNC_MIN_CORR = 0.88;      // how closely movement must match to be a refl
 const SYNC_MAX_SIZE = 0.88;      // a reflection looks smaller than the person (further away)
 
 export class PresenceFilter {
-  constructor({ maxDistance = 4.5, liveness = true, liveMotion = 0.06, facing = true, reflections = true } = {}) {
-    Object.assign(this, { maxDistance, liveness, liveMotion, facing, reflections });
+  constructor({ minDistance = 0, maxDistance = 4.5, liveness = true, liveMotion = 0.06, facing = true, reflections = true } = {}) {
+    Object.assign(this, { minDistance, maxDistance, liveness, liveMotion, facing, reflections });
     this.cands = [];
     this.zones = [];
     this.rejected = []; // last frame's rejected detections (for preview / UI hints)
@@ -69,7 +70,9 @@ export class PresenceFilter {
     for (const d of dets) {
       const c = d._cand;
       const limit = this.maxDistance * (c.wasNear ? 1.15 : 1);
+      const minLimit = this.minDistance * (c.wasNear ? 0.85 : 1);
       if (d.dist != null && d.dist > limit) { d.reject = 'far'; rejected.push(d); continue; }
+      if (d.dist != null && d.dist < minLimit) { d.reject = 'near'; rejected.push(d); continue; }
       c.wasNear = true;
       if (c.reflection) { d.reject = 'mirror'; rejected.push(d); continue; }
       if (this.liveness && !c.live) { d.reject = this.facing && c.facing < 0.6 ? 'back' : 'still'; rejected.push(d); continue; }

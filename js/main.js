@@ -23,7 +23,7 @@ let game, pose = null, SKELETON = [];
 const sfx = new Sfx();
 const tracker = new IdTracker({ lostGraceMs: CONFIG.LOST_GRACE_MS });
 // Ignores people who are too far away and bodies that never move (photos / posters / screens)
-const presence = new PresenceFilter({ maxDistance: CONFIG.MAX_DISTANCE_M, liveness: CONFIG.LIVENESS, liveMotion: CONFIG.LIVE_MOTION, facing: CONFIG.FACING, reflections: CONFIG.REFLECTIONS });
+const presence = new PresenceFilter({ minDistance: CONFIG.MIN_DISTANCE_M, maxDistance: CONFIG.MAX_DISTANCE_M, liveness: CONFIG.LIVENESS, liveMotion: CONFIG.LIVE_MOTION, facing: CONFIG.FACING, reflections: CONFIG.REFLECTIONS });
 const images = {};
 const link = new Link();
 
@@ -204,7 +204,9 @@ const FLOWS = {
           if (!p.present) {
             ready[s] = false;
             const far = presence.rejected.some((d) => d.reject === 'far' && tracker.sideOf(d.x) === s);
+            const near = presence.rejected.some((d) => d.reject === 'near' && tracker.sideOf(d.x) === s);
             if (far) setSlot(s, 'none', 'Come a bit closer', `Stand within ${CONFIG.MAX_DISTANCE_M} m`, 0);
+            else if (near) setSlot(s, 'none', 'Step back a little', `Stand at least ${CONFIG.MIN_DISTANCE_M} m away`, 0);
             else setSlot(s, 'none', solo ? 'Step in front of the screen' : `Step in on the ${ui[s].side}`, solo ? 'Stand in the middle' : 'Stand on your side', 0);
             continue;
           }
@@ -422,7 +424,7 @@ function drawPip() {
         pipCtx.beginPath(); pipCtx.moveTo(X(d.lm[a]), Y(d.lm[a])); pipCtx.lineTo(X(d.lm[b]), Y(d.lm[b])); pipCtx.stroke();
       }
     } else { pipCtx.fillStyle = col; pipCtx.beginPath(); pipCtx.arc(d.x * W, H * 0.5, 22, 0, 7); pipCtx.fill(); }
-    const tag = d.slot ? `P${d.slot}` : ({ far: 'FAR', still: 'STILL', back: 'BACK', mirror: 'MIRROR' })[d.reject] || '—';
+    const tag = d.slot ? `P${d.slot}` : ({ far: 'FAR', near: 'NEAR', still: 'STILL', back: 'BACK', mirror: 'MIRROR' })[d.reject] || '—';
     const tw = d.reject ? 66 : 44;
     pipCtx.fillStyle = col; pipCtx.fillRect(d.x * W - tw / 2, Math.max(4, d.y * H - 70), tw, 26);
     pipCtx.fillStyle = '#fff'; pipCtx.font = '800 16px Inter, sans-serif'; pipCtx.textAlign = 'center';

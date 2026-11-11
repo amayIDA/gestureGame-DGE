@@ -17,7 +17,7 @@ Two parts, served by one program on the game PC:
 - The whole game is built into `CatchTheTarget.exe`; nothing else is needed. If neither Chrome nor Edge is installed, Chrome is installed automatically. Close the game with Alt+F4.
 - `settings.txt` changes the port, round length, etc. Logs: `%LOCALAPPDATA%\CatchTheTarget\launcher.log`. Rebuild the exe after changing the game with `launcher-src/build.sh` (needs Go).
 
-**Mac:** double-click **`start.command`**. It starts the server, opens Chrome full-screen and prints the tablet link in the Terminal window. If macOS asks whether Python may accept incoming connections, click **Allow** (needed for the tablet).
+**Mac:** double-click **`start.command`**. It starts the server, opens Chrome full-screen and prints the tablet link in the Terminal window. Options are read from `settings.txt` in the project folder (same format as the Windows one). If macOS asks whether Python may accept incoming connections, click **Allow** (needed for the tablet).
 
 **Manually:** `python3 server.py`, then open `http://127.0.0.1:7420` in Chrome.
 
@@ -51,15 +51,16 @@ MediaPipe reports poses in random order each frame. `js/idtracker.js` turns them
 - **Body size.** Shoulder width (distance from the camera) must stay consistent.
 - **Appearance.** A colour signature of each player's clothing is learned during play.
 - **Global matching.** Every frame, the detection-to-player pairing with the lowest total cost wins.
+- **Newcomers never take over.** From the countdown until the results, the players are locked in. Someone who walks into the frame (between the players, next to them, or across the whole screen in single-player mode) is ignored and never gets a basket. If a player briefly steps out, their basket waits for them. The only case that can be fooled: a player steps out *and* someone of the same build in very similar clothes steps into that exact spot before they return. On the join screen, an empty side can be filled by whoever stands there. The camera looks at up to 3 people at once (`poses=`); raise it to 4 in very busy areas.
 - **Locked identities during a round.** A player who steps out keeps their slot (their basket dims with "Step back into view") and is re-acquired only by someone who matches their size and clothing. Passers-by are ignored.
 - **Lanes.** Each basket stays in its own half, so players never fight over a basket.
 
 ## Who counts as a player
 `js/presence.js` filters people before they can take a slot:
-- **Distance limit.** Each person's distance is estimated from their shoulder width and torso length. Anyone further than **4.5 m** is ignored. On the join screen they're told to "Come a bit closer". Change it with `maxdist=` (metres). If distances look wrong for your webcam, set its field of view with `fov=` (default 78°).
+- **Distance limits.** Each person's distance is estimated from their shoulder width and torso length. Only people between **1 m and 4.5 m** from the camera count. On the join screen, anyone outside that range is told "Step back a little" or "Come a bit closer". Change the limits with `mindist=` and `maxdist=` (metres) in `settings.txt` (Windows: `windows/settings.txt`, Mac: `settings.txt`). If distances look wrong for your webcam, set its field of view with `fov=` (default 78°). Press `Shift+D` to see each person's estimated distance.
 - **Photos, posters and screens.** A body has to *move* (walk in, raise a hand, shift their weight about 5 cm) before it can play. Pictures of people never do, so they're ignored. Spots where a still body keeps being seen are remembered, and need even more movement there. Raise or lower the sensitivity with `motion=` (default 0.12). Turn the check off with `liveness=0`.
 - **Reflections (mirrors, glass doors, shiny walls).** A mirror behind the players shows their *back*, so players must face the camera (face visible) to join. Glass or a mirror at the side can show a mirrored *front* view. That copy moves in perfect sync with a nearer, bigger person, so any smaller body whose movement keeps matching someone else's is ignored as a reflection. A real second player standing further back is accepted once they move on their own (about 2–3 s). Turn these off with `facing=0` / `reflections=0`.
-- In the camera view (`C`), ignored bodies are grey and tagged **FAR**, **STILL**, **BACK** or **MIRROR**. `Shift+D` shows each person's estimated distance.
+- In the camera view (`C`), ignored bodies are grey and tagged **FAR**, **NEAR**, **STILL**, **BACK** or **MIRROR**. `Shift+D` shows each person's estimated distance.
 
 ## Setup tips
 - Put the camera centred at about chest height (1.2–1.4 m). Players stand **2.5–4 m** away, about 1.5 m apart.
@@ -79,7 +80,7 @@ MediaPipe reports poses in random order each frame. `js/idtracker.js` turns them
 | `F` | Full screen |
 
 ## URL options
-`?round=60` round length · `?noshow=60` wait for registered players (s) · `?model=lite` faster model for weaker machines · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?maxdist=4.5` max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection
+`?round=60` round length · `?noshow=60` wait for registered players (s) · `?model=lite` faster model for weaker machines · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?mindist=1.0` / `?maxdist=4.5` min / max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection
 
 ## Files
 ```

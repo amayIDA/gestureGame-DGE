@@ -31,7 +31,8 @@ export const CONFIG = {
   RANGE_SOLO: [0.15, 0.85],
 
   // Who counts as a player
-  MAX_DISTANCE_M: num('maxdist', 4.5),     // people further than this (metres) are ignored
+  MIN_DISTANCE_M: num('mindist', 1.0),     // people closer than this (metres) are ignored ("step back")
+  MAX_DISTANCE_M: num('maxdist', 4.5),     // people further than this (metres) are ignored ("come closer")
   CAMERA_HFOV: num('fov', 78),             // webcam horizontal field of view (most 1080p webcams: 70–90°)
   LIVENESS: bool('liveness', true),        // ignore bodies that never move (photos, posters, TV screens)
   FACING: bool('facing', true),            // players must face the camera to join (rejects mirror back-views)

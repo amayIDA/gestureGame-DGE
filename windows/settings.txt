@@ -8,7 +8,9 @@
 # model=lite      # faster body tracking for slower PCs (default: full)
 # camera=logitech # use the webcam whose name contains this text
 # windowed=1      # open in a normal window instead of full screen
+# mindist=1.0     # ignore people closer than this many metres to the camera
 # maxdist=4.5     # ignore people further than this many metres from the camera
+# poses=3        # how many people the camera looks at at once (raise to 4 in busy areas)
 # fov=78          # your webcam's horizontal field of view (helps the distance estimate)
 # motion=0.12     # movement needed to prove someone is real, not a photo (higher = stricter)
 # liveness=0      # 0 = turn off the photo/poster check
