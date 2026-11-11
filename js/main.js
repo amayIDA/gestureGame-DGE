@@ -251,8 +251,8 @@ const FLOWS = {
     applyNames();
     show('scr-countdown', { hud: true, field: true });
     updateHud(true);
-    $('time').textContent = fmtTime(CONFIG.ROUND_SECONDS);
-    $('timerCard').classList.remove('final');
+    setText($('time'), fmtTime(CONFIG.ROUND_SECONDS));
+    setClass($('timerCard'), 'final', false);
     report('countdown');
     let shown = null;
     const num = $('countNum'), dots = [...$('countDots').children];
@@ -290,9 +290,9 @@ const FLOWS = {
         feedBaskets(now);
         game.update(dt, { progress: clamp(el / total, 0, 1), spawning: !ending, final: remaining <= CONFIG.FINAL_SECONDS });
         updateHud();
-        $('time').textContent = fmtTime(Math.ceil(remaining));
+        setText($('time'), fmtTime(Math.ceil(remaining)));
         if (remaining <= CONFIG.FINAL_SECONDS && !ending) {
-          $('timerCard').classList.add('final');
+          setClass($('timerCard'), 'final', true);
           if (!finalShown) { finalShown = true; banner(`FINAL ${CONFIG.FINAL_SECONDS} SECONDS!`, true); }
           const sec = Math.ceil(remaining);
           if (sec !== lastSec) { lastSec = sec; sfx.tick(); }
@@ -310,7 +310,7 @@ const FLOWS = {
   // ── Results (tracking off), then back to idle for the next group ──
   results(slots) {
     show('scr-results');
-    $('timerCard').classList.remove('final');
+    setClass($('timerCard'), 'final', false);
     const sc = game.scores;
     const h1 = $('winnerText');
     const bdi = (t) => Object.assign(document.createElement('bdi'), { textContent: t });
@@ -381,21 +381,27 @@ function feedBaskets(now) {
   }
 }
 
-const hudCache = {};
+// Only touch the page when something actually changed: rewriting text every frame
+// makes the browser redo layout + paint 60 times a second.
+const hudCache = {}, hudPlayer = {};
+const domCache = new Map();
+function setText(el, v) { if (domCache.get(el) !== v) { domCache.set(el, v); el.textContent = v; } }
+function setClass(el, cls, on) { const k = el.id + '|' + cls; if (domCache.get(k) !== on) { domCache.set(k, on); el.classList.toggle(cls, on); } }
 function updateHud(force) {
+  if (force) domCache.clear();
   for (const s of [1, 2]) {
     const r = game.scores[s];
     const el = $(`score${s}`), st = $(`streak${s}`);
-    if (!r) { el.textContent = '0'; st.classList.remove('on'); continue; }
+    if (!r) { setText(el, '0'); setClass(st, 'on', false); continue; }
     const prev = hudCache[s];
     if (force || prev !== r.score) {
       el.textContent = r.score;
       if (!force && prev != null) { el.classList.remove('pop', 'hit'); void el.offsetWidth; el.classList.add(r.score > prev ? 'pop' : 'hit'); }
       hudCache[s] = r.score;
     }
-    st.textContent = `🔥 ${r.streak} streak`;
-    st.classList.toggle('on', r.streak >= 3);
-    document.querySelector(`.hud-player[data-slot="${s}"]`).classList.toggle('gone', game.baskets[s] && !game.baskets[s].present);
+    if (r.streak >= 3) setText(st, `🔥 ${r.streak} streak`);
+    setClass(st, 'on', r.streak >= 3);
+    setClass(hudPlayer[s] ||= document.querySelector(`.hud-player[data-slot="${s}"]`), 'gone', !!(game.baskets[s] && !game.baskets[s].present));
   }
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
@@ -434,21 +440,25 @@ function drawPip() {
 function drawDebug(now) {
   const el = $('debug'); if (el.classList.contains('hidden')) return;
   const line = (s) => { const t = tracker.get(s); return t ? `P${s} ${t.present ? 'ON ' : 'off'} ${t.det?.dist ? t.det.dist.toFixed(1) + 'm ' : ''}x=${t.fx.toFixed(2)} sw=${t.sw.toFixed(2)} hand=${t.handUpSince ? 'UP' : '--'} seen ${Math.round(now - t.lastSeen)}ms` : `P${s} empty`; };
-  el.textContent = `state ${flow.name}  mode ${tracker.mode}  ${sim.on ? 'KEYBOARD' : `camera ${pose ? pose.fps.toFixed(0) + 'fps ' + pose.delegate : 'none'}`}\npeople in view: ${tracker.detections.length}  ignored: ${presence.rejected.map((d) => `${d.reject}${d.dist ? ' ' + d.dist.toFixed(1) + 'm' : ''}`).join(', ') || 'none'}  static zones: ${presence.zones.length}\n${line(1)}\n${line(2)}`;
+  el.textContent = `state ${flow.name}  mode ${tracker.mode}  screen ${perf.fps.toFixed(0)}fps (slowest ${perf.worstShown.toFixed(0)}ms)  ${sim.on ? 'KEYBOARD' : `tracking ${pose ? `${pose.fps.toFixed(0)}fps ${pose.detMs.toFixed(0)}ms ${pose.delegate} ${pose.mode}` : 'none'}`}\npeople in view: ${tracker.detections.length}  ignored: ${presence.rejected.map((d) => `${d.reject}${d.dist ? ' ' + d.dist.toFixed(1) + 'm' : ''}`).join(', ') || 'none'}  static zones: ${presence.zones.length}\n${line(1)}\n${line(2)}`;
 }
 
 // ─────────────────────────── main loop ───────────────────────────
 let last = performance.now();
+const perf = { fps: 0, frames: 0, t: performance.now(), worst: 0, worstShown: 0 };
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = Math.min(0.05, (now - last) / 1000);
+  perf.worst = Math.max(perf.worst, now - last); last = now;
+  if (++perf.frames && now - perf.t >= 1000) { perf.fps = perf.frames * 1000 / (now - perf.t); perf.frames = 0; perf.t = now; perf.worstShown = perf.worst; perf.worst = 0; }
   let dets = null;
   if (!flow.trackingOff) {
+    let t = now;
     if (sim.on) dets = simDets(dt);
     else if (pose) {
-      try { dets = pose.detect(now); } catch (e) { console.error(e); }
-      if (dets) dets = presence.filter(dets, now);
+      try { dets = pose.detect(now); t = pose.detTs || now; } catch (e) { console.error(e); }
+      if (dets) dets = presence.filter(dets, t);
     }
-    if (dets) tracker.update(dets, now);
+    if (dets) tracker.update(dets, t);
   } else { tracker.detections = []; presence.rejected = []; }
 
   flow.update?.(dt, now);
@@ -492,6 +502,7 @@ async function boot() {
   game = new Game($('game'), images, sfx);
   buildGuide();
   if (CONFIG.DEBUG) Object.assign(window, { __game: game, __tracker: tracker, __presence: presence, __go: go, __link: link, __showTabletLink: showTabletLink });
+  if (CONFIG.DEBUG) Object.defineProperty(window, '__pose', { get: () => pose });
 
   const forceKeyboard = new URLSearchParams(location.search).has('keyboard');
   if (!forceKeyboard) {

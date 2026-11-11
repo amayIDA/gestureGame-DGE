@@ -1,5 +1,6 @@
 // Camera + MediaPipe Pose Landmarker (multi-person) → per-frame person descriptions.
-import { FilesetResolver, PoseLandmarker } from '../vendor/mediapipe/vision_bundle.js';
+// The model runs in a background thread (pose-worker.js) so it never holds up drawing;
+// if the browser can't do that, it runs here on the main thread as before.
 import { CONFIG } from './config.js';
 
 const LM = { NOSE: 0, LS: 11, RS: 12, LW: 15, RW: 16, LI: 19, RI: 20, LH: 23, RH: 24 };
@@ -17,6 +18,10 @@ export class PoseSource {
     this.lastTs = 0;
     this.fps = 0; this._frames = 0; this._fpsT = performance.now();
     this.delegate = '';
+    this.worker = null; this.busy = false; this.busySince = 0; this.result = null; this.seq = 0; this.errors = 0;
+    this.detTs = 0;      // camera-frame time of the last returned detections
+    this.detMs = 0;      // how long the model took on the last frame
+    this.mode = '';      // 'worker' | 'main'
   }
 
   async startCamera() {
@@ -36,10 +41,43 @@ export class PoseSource {
     await this.video.play();
   }
 
+  modelUrl() { return new URL(`../vendor/models/pose_landmarker_${CONFIG.MODEL}.task`, import.meta.url).href; }
+  wasmUrl() { return new URL('../vendor/mediapipe/wasm', import.meta.url).href; }
+
   async loadModel() {
-    const fileset = await FilesetResolver.forVisionTasks(new URL('../vendor/mediapipe/wasm', import.meta.url).href);
+    if (CONFIG.POSE_WORKER && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined' && typeof createImageBitmap !== 'undefined') {
+      try { await this.loadWorker(); return; } catch (e) {
+        console.warn('Background body tracking unavailable, running it on the main thread', e);
+        this.worker?.terminate(); this.worker = null;
+      }
+    }
+    await this.loadMain();
+  }
+
+  loadWorker() {
+    return new Promise((resolve, reject) => {
+      const w = new Worker(new URL('./pose-worker.js', import.meta.url));
+      const timer = setTimeout(() => reject(new Error('worker start timed out')), 60000);
+      w.onerror = (e) => { clearTimeout(timer); reject(new Error(e.message || 'worker failed to load')); };
+      w.onmessage = (e) => {
+        const m = e.data;
+        if (m.type === 'ready') {
+          clearTimeout(timer);
+          this.worker = w; this.delegate = m.delegate; this.mode = 'worker';
+          w.onmessage = (ev) => this.onWorker(ev.data);
+          w.onerror = (ev) => { console.error('pose worker', ev.message); this.toMain(); };
+          resolve();
+        } else if (m.type === 'error') { clearTimeout(timer); reject(new Error(m.message)); }
+      };
+      w.postMessage({ type: 'init', wasm: this.wasmUrl(), model: this.modelUrl(), numPoses: CONFIG.NUM_POSES, delegate: 'GPU' });
+    });
+  }
+
+  async loadMain() {
+    const { FilesetResolver, PoseLandmarker } = await import('../vendor/mediapipe/vision_bundle.js');
+    const fileset = await FilesetResolver.forVisionTasks(this.wasmUrl());
     const opts = (delegate) => ({
-      baseOptions: { modelAssetPath: new URL(`../vendor/models/pose_landmarker_${CONFIG.MODEL}.task`, import.meta.url).href, delegate },
+      baseOptions: { modelAssetPath: this.modelUrl(), delegate },
       runningMode: 'VIDEO',
       numPoses: CONFIG.NUM_POSES,
       minPoseDetectionConfidence: 0.5,
@@ -54,18 +92,70 @@ export class PoseSource {
       this.landmarker = await PoseLandmarker.createFromOptions(fileset, opts('CPU'));
       this.delegate = 'CPU';
     }
+    this.mode = 'main';
   }
 
-  // Returns null when there's no new camera frame, else an array of people.
+  // the background thread keeps failing → carry on in the main thread
+  toMain() {
+    if (!this.worker) return;
+    this.worker.terminate(); this.worker = null; this.busy = false;
+    this.loadMain().catch((e) => console.error('body tracking unavailable', e));
+  }
+
+  onWorker(m) {
+    if (m.type === 'result') {
+      this.busy = false; this.errors = 0;
+      this.result = m; this.detMs = m.ms;
+      this.countFrame(performance.now());
+      this.pump(performance.now()); // start on the next camera frame straight away
+    } else if (m.type === 'error') {
+      this.busy = false;
+      console.warn('pose worker:', m.message);
+      if (++this.errors > 8) this.toMain();
+    }
+  }
+
+  // send the newest camera frame to the worker (one frame in flight at a time)
+  pump(now) {
+    const v = this.video;
+    if (!this.worker) return;
+    if (this.busy) { if (now - this.busySince > 3000) this.busy = false; else return; } // lost frame → retry
+    if (v.readyState < 2 || v.currentTime === this.lastVideoTime) return;
+    this.lastVideoTime = v.currentTime;
+    const ts = Math.max(now, this.lastTs + 1); this.lastTs = ts;
+    this.busy = true; this.busySince = now;
+    const id = ++this.seq;
+    createImageBitmap(v).then((bitmap) => {
+      if (!this.worker) { bitmap.close(); return; }
+      this.worker.postMessage({ type: 'frame', bitmap, ts, id }, [bitmap]);
+    }).catch(() => { this.busy = false; });
+  }
+
+  countFrame(now) {
+    this._frames++;
+    if (now - this._fpsT > 1000) { this.fps = (this._frames * 1000) / (now - this._fpsT); this._frames = 0; this._fpsT = now; }
+  }
+
+  // Returns null when there's no new result, else an array of people.
+  // `detTs` is the time the camera frame was taken (use it for motion maths).
   detect(now) {
+    if (this.worker) {
+      this.pump(now);
+      const r = this.result;
+      if (!r) return null;
+      this.result = null;
+      this.detTs = r.ts;
+      return r.landmarks.map((lm) => this.describe(lm, r.img)).filter(Boolean);
+    }
     const v = this.video;
     if (!this.landmarker || v.readyState < 2 || v.currentTime === this.lastVideoTime) return null;
     this.lastVideoTime = v.currentTime;
     const ts = Math.max(now, this.lastTs + 1); this.lastTs = ts;
+    const t0 = performance.now();
     const res = this.landmarker.detectForVideo(v, ts);
-
-    this._frames++;
-    if (now - this._fpsT > 1000) { this.fps = (this._frames * 1000) / (now - this._fpsT); this._frames = 0; this._fpsT = now; }
+    this.detMs = performance.now() - t0;
+    this.countFrame(now);
+    this.detTs = ts;
 
     this.sctx.drawImage(v, 0, 0, this.sampler.width, this.sampler.height);
     const img = this.sctx.getImageData(0, 0, this.sampler.width, this.sampler.height).data;

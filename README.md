@@ -68,6 +68,14 @@ MediaPipe reports poses in random order each frame. `js/idtracker.js` turns them
 - Use a 1080p webcam and even, front-facing light. Avoid strong backlight such as windows behind the players.
 - Tune each player's reach with URL params if needed: `?p1min=0.08&p1max=0.46&p2min=0.54&p2max=0.92`.
 
+## Smooth 60 fps
+
+Body tracking runs in a background thread (`js/pose-worker.js`), so the falling items are drawn at the
+screen's full refresh rate (60 fps or more) while MediaPipe works on each camera frame (about 30 times a second).
+Drawing never waits for the camera. Press `Shift+D` to see both numbers: `screen` (drawing fps) and `tracking`
+(camera frames processed per second and milliseconds per frame). If the PC is slow, `model=lite` in settings.txt
+makes tracking lighter; the drawing stays smooth either way.
+
 ## Keys (all)
 | Key | Action |
 |---|---|
@@ -75,12 +83,12 @@ MediaPipe reports poses in random order each frame. `js/idtracker.js` turns them
 | `Enter` | Skip to next screen (idle: test game without the tablet, `Shift+Enter` = one player) |
 | `Esc` | Skip the current group, back to idle |
 | `C` | Toggle camera preview |
-| `Shift+D` | Debug overlay (fps, tracker state) |
+| `Shift+D` | Debug overlay (screen fps, tracking fps + ms per frame, tracker state) |
 | `M` | Mute |
 | `F` | Full screen |
 
 ## URL options
-`?round=60` round length · `?noshow=60` wait for registered players (s) · `?model=lite` faster model for weaker machines · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?mindist=1.0` / `?maxdist=4.5` min / max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection
+`?round=60` round length · `?noshow=60` wait for registered players (s) · `?model=lite` faster model for weaker machines · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?mindist=1.0` / `?maxdist=4.5` min / max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection · `?worker=0` run body tracking on the main thread instead of a background thread
 
 ## Files
 ```

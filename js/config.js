@@ -19,6 +19,7 @@ export const CONFIG = {
   // Body tracking
   MODEL: params.get('model') || 'full',     // 'full' (accurate) or 'lite' (faster machines)
   NUM_POSES: num('poses', 3),               // detect up to 3 so a passer-by can't steal a slot
+  POSE_WORKER: bool('worker', true),        // run body tracking in a background thread (keeps 60 fps)
   CAMERA_WIDTH: 1280,
   CAMERA_HEIGHT: 720,
   CAMERA_LABEL: params.get('camera') || '', // pick a camera whose label contains this text

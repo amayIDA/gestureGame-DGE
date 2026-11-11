@@ -37,7 +37,7 @@ body.kiosk { cursor: none; }
 }
 
 #playfield { position: absolute; left: 60px; top: 176px; width: 2057px; height: 864px; background: rgba(255,255,255,0.42); backdrop-filter: none; -webkit-backdrop-filter: none; }
-#game { position: absolute; inset: 0; width: 2177px; height: 1080px; pointer-events: none; }
+#game { position: absolute; inset: 0; width: 2177px; height: 1080px; pointer-events: none; will-change: transform; }
 
 .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; animation: screenIn .5s cubic-bezier(.2,.8,.2,1); }
 @keyframes screenIn { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
@@ -87,7 +87,8 @@ body.kiosk { cursor: none; }
 
 /* ── HUD ── */
 #hud { position: absolute; left: 60px; right: 60px; top: 36px; height: 116px; display: grid; grid-template-columns: 500px 1fr 500px; gap: 30px; }
-.hud-card { position: relative; background: var(--glass); border: 1.5px solid var(--glass-border); box-shadow: var(--shadow); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-radius: 24px; display: flex; align-items: center; padding: 0 30px; }
+/* no backdrop blur on the HUD: it sits over the moving video and would be re-blurred every frame */
+.hud-card { position: relative; background: rgba(255, 255, 255, 0.8); border: 1.5px solid var(--glass-border); box-shadow: var(--shadow); border-radius: 24px; display: flex; align-items: center; padding: 0 30px; }
 .hud-player { justify-content: space-between; transition: transform .25s; }
 .hud-player.gone { opacity: .5; }
 .hud-label { font-size: 21px; font-weight: 800; letter-spacing: .12em; color: var(--navy); }

@@ -53,7 +53,7 @@ export class Game {
   }
 
   makeCard(img, label, gold) {
-    const s = 1.5; // supersample for crisp text when the stage is scaled up
+    const s = R; // exactly the size it's drawn at: sharp, and the cheapest possible copy every frame
     const cv = document.createElement('canvas');
     cv.width = (CARD_W + CARD_PAD * 2) * s; cv.height = (CARD_H + CARD_PAD * 2) * s;
     const g = cv.getContext('2d'); g.scale(s, s); g.translate(CARD_PAD, CARD_PAD);
@@ -261,7 +261,7 @@ export class Game {
 
     if (showItems) {
       // items enter from and leave through the playfield frame
-      g.save(); roundRect(g, PF.x, PF.y, PF.w, PF.h, 30); g.clip();
+      g.save(); g.beginPath(); g.rect(PF.x, PF.y, PF.w, PF.h); g.clip(); // plain rectangle clip = fast path
       for (const it of this.items) if (it.state !== 'caught') this.drawItem(it);
       g.restore();
     }

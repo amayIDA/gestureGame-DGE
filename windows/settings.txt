@@ -16,3 +16,4 @@
 # liveness=0      # 0 = turn off the photo/poster check
 # facing=0        # 0 = allow people seen from the back (turn off the mirror back-view check)
 # reflections=0   # 0 = turn off reflection detection (bodies copying another person's movement)
+# worker=0        # run body tracking on the main thread (only if tracking fails to start)
