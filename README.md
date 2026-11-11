@@ -1,6 +1,6 @@
 # Catch the Target — SCAD body-tracking game with tablet registration
 
-Players register on a **tablet** (one player or two). The **game PC** calls them in by name; they stand in front of the webcam and their basket follows their body left and right. They catch SCAD-related items (statistics, census, data…) and let unrelated ones (frying pan, perfume…) fall past. 60-second rounds.
+Players register on a **tablet** (one player or two). The **game PC** calls them in by name; they stand in front of the webcam and their basket follows their body left and right. They catch SCAD-related items (statistics, census, data…) and let unrelated ones (alarm clock, perfume…) fall past. 60-second rounds.
 
 Two parts, served by one program on the game PC:
 

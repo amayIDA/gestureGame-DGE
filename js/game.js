@@ -89,8 +89,9 @@ export class Game {
   setNames(names) {
     for (const s of [1, 2]) {
       const n = (names[s] || `P${s}`).trim();
+      // short names stay whole ("Player 1", "Sara Ali"); long ones use the first name ("Amay")
       const first = n.split(' ')[0];
-      const short = first.length >= 3 ? first : n;
+      const short = [...n].length <= 12 || [...first].length < 3 ? n : first;
       this.names[s] = [...short].length > 12 ? [...short].slice(0, 11).join('') + '…' : short;
     }
   }
