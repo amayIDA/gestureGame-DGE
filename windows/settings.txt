@@ -3,6 +3,8 @@
 
 # port=7420       # network port for the game + tablet link (change if another app uses 7420)
 # round=60        # round length in seconds
+# speed=260       # how fast items fall at the start (lower = slower; was 320)
+# speedmax=450    # how fast items fall by the end of the round (was 560)
 # idle=15         # seconds the results stay on screen
 # noshow=60       # seconds to wait for registered players to step in before moving on
 # model=lite      # faster body tracking for slower PCs (default: full)
