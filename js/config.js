@@ -47,10 +47,9 @@ export const CONFIG = {
   CATCH_RATIO: 0.62,        // share of SCAD items vs unrelated items
   BONUS_EVERY_S: 9,         // golden SCAD bonus (+3)
   STREAK_BONUS_EVERY: 5,    // every 5 in a row → +1
-  SPEED_START: num('speed', 260),      // fall speed at the start of a round (design px/s; 1080 = screen height)
-  SPEED_END: num('speedmax', 450),     // fall speed by the end of the round (it speeds up gradually)
-  SPAWN_START: 0.95,         // seconds between waves
-  SPAWN_END: 0.5,
+  SPEED_START: num('speed', 130),      // fall speed (design px/s; 1080 = screen height → ~7 s top to bottom)
+  SPEED_END: num('speedmax', num('speed', 130)), // speed by the end of the round; same as `speed` = steady pace
+  SPAWN_GAP: num('gap', 2.2),          // seconds between items (one item at a time, evenly spaced)
 
   DEBUG: bool('debug', false),
   KIOSK: bool('kiosk', false),

@@ -88,7 +88,7 @@ makes tracking lighter; the drawing stays smooth either way.
 | `F` | Full screen |
 
 ## URL options
-`?round=60` round length · `?speed=260` / `?speedmax=450` fall speed at the start / end of a round · `?noshow=60` wait for registered players (s) · `?model=lite` faster model for weaker machines · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?mindist=1.0` / `?maxdist=4.5` min / max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection · `?worker=0` run body tracking on the main thread instead of a background thread
+`?round=60` round length · `?speed=130` fall speed · `?speedmax=130` speed by the end of the round (higher = speeds up) · `?gap=2.2` seconds between items · `?noshow=60` wait for registered players (s) · `?model=lite` faster model for weaker machines · `?camera=logitech` choose camera by name · `?debug=1` · `?keyboard` skip the camera · `?hold=700` hand-raise hold (ms) · `?mirror=0` · `?mindist=1.0` / `?maxdist=4.5` min / max player distance (m) · `?fov=78` webcam field of view · `?motion=0.12` movement needed to count as a real person · `?liveness=0` allow still bodies · `?facing=0` allow back views · `?reflections=0` turn off reflection detection · `?worker=0` run body tracking on the main thread instead of a background thread
 
 ## Files
 ```

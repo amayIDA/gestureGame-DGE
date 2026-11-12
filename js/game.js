@@ -125,14 +125,14 @@ export class Game {
   spawnWave(progress, forced) {
     const kind = forced || (Math.random() < CONFIG.CATCH_RATIO ? 'catch' : 'avoid');
     const item = kind === 'catch' ? this.catchBag.next() : kind === 'avoid' ? this.avoidBag.next() : null;
-    const speed = lerp(CONFIG.SPEED_START, CONFIG.SPEED_END, easeInOut(progress)) * rand(0.92, 1.08);
+    const speed = lerp(CONFIG.SPEED_START, CONFIG.SPEED_END, easeInOut(progress)) * rand(0.97, 1.03);
     // Same item, same moment, both lanes → a fair race; positions differ per lane.
     for (const s of this.slots) {
       const L = this.lanes[s], m = CARD_W / 2 + 22;
       let x = rand(L.x0 + m, L.x1 - m);
       for (let k = 0; k < 4 && this.lastX[s] != null && Math.abs(x - this.lastX[s]) < 190; k++) x = rand(L.x0 + m, L.x1 - m);
       this.lastX[s] = x;
-      const delay = rand(0, 0.18);
+      const delay = 0;
       this.items.push({
         kind, item, lane: s, x, y: PF.y - CARD_H / 2 - delay * speed, vy: speed,
         t: 0, phase: rand(0, 6.28), sway: rand(8, 22), state: 'fall', k: 0, rot: 0, drawX: x, scale: 1,
@@ -144,14 +144,15 @@ export class Game {
     this.time += dt;
     if (spawning) {
       this.spawnT -= dt;
-      if (this.spawnT <= 0) {
-        let interval = lerp(CONFIG.SPAWN_START, CONFIG.SPAWN_END, easeInOut(progress));
-        if (final) interval *= 0.85;
-        this.spawnT = interval * rand(0.85, 1.15);
-        this.spawnWave(progress);
-      }
+      // One item at a time at a steady pace, never two dropping together. The gap is at
+      // least ~1.5 cards apart so falling items never overlap.
       this.bonusT -= dt;
-      if (this.bonusT <= 0) { this.bonusT = CONFIG.BONUS_EVERY_S * rand(0.8, 1.2); this.spawnWave(progress, 'bonus'); }
+      if (this.spawnT <= 0) {
+        const speed = lerp(CONFIG.SPEED_START, CONFIG.SPEED_END, easeInOut(progress));
+        this.spawnT = Math.max(CONFIG.SPAWN_GAP, (CARD_H * 1.5) / speed) * rand(0.95, 1.05);
+        if (this.bonusT <= 0) { this.bonusT = CONFIG.BONUS_EVERY_S * rand(0.8, 1.2); this.spawnWave(progress, 'bonus'); } // replaces a normal item
+        else this.spawnWave(progress);
+      }
     }
 
     // baskets
